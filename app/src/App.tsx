@@ -45,6 +45,7 @@ import {
   computeKpisExtras,
   countPrazoAte,
   filterOportunidades,
+  isRegistroTeste,
   labelNicho,
   pickPriority,
   rotuloFiltroPrazo,
@@ -433,6 +434,16 @@ export function App() {
   const kpiTotalBanco = listaParaKpisLocais.length;
   const kpiPrazoRotulo = rotuloFiltroPrazo(dias);
 
+  // Escopo UF na lista vs banner: diferença = registros de teste ocultos.
+  const nTestesOcultosUf = useMemo(() => {
+    if (mostrarTestes) return 0;
+    return lista.filter((o) => isRegistroTeste(o)).length;
+  }, [lista, mostrarTestes]);
+  const totalEscopoVisivelUf = useMemo(() => {
+    if (mostrarTestes) return lista.length;
+    return lista.filter((o) => !isRegistroTeste(o)).length;
+  }, [lista, mostrarTestes]);
+
   // Contagens do select Nicho: respeitam UF (lista) + prazo ativo.
   const nichoOpcoes = useMemo(() => {
     const base = filterOportunidades(lista, {
@@ -644,6 +655,8 @@ export function App() {
                 ordenacaoRotulo={ordenacaoRotulo}
                 modo={modo}
                 escopoUf={escopoUf}
+                totalEscopoVisivel={totalEscopoVisivelUf}
+                nTestesOcultos={nTestesOcultosUf}
               />
 
               {modo === 'ti' && !alertasDismissed && alertas && (
@@ -660,6 +673,7 @@ export function App() {
                 total={kpiTotal}
                 totalBanco={kpiTotalBanco}
                 prazoRotulo={kpiPrazoRotulo}
+                nTestesOcultos={nichoAtivo ? 0 : nTestesOcultosUf}
                 altaConfianca={extras.altaConfianca}
                 scoreMedio={extras.scoreMedio}
                 orgaosAtivos={extras.orgaosAtivos}

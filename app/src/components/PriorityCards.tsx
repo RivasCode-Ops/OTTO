@@ -1,7 +1,7 @@
 import { EmptyState } from './EmptyState';
 import { fmtDate, fmtMoney } from '../api';
 import type { Oportunidade } from '../types';
-import { daysUntil, getMunicipio, highlightReason, scoreTier } from '../utils';
+import { daysUntil, getMunicipio, highlightReason, labelNicho, scoreTier } from '../utils';
 
 type Props = {
   items: Oportunidade[];
@@ -61,7 +61,7 @@ export function PriorityCards({
               >
                 <div className="priority-card__head">
                   {geral ? (
-                    <span className="conf-pill conf-pill--alta">{o.nicho || 'nicho'}</span>
+                    <span className="conf-pill conf-pill--nicho">{labelNicho(o.nicho)}</span>
                   ) : (
                     <>
                       <span className={`score-badge score-badge--${tier}`}>{o.score_total.toFixed(0)}</span>

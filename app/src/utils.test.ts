@@ -238,6 +238,9 @@ describe('isRegistroTeste / labelCategoria', () => {
     expect(
       labelCategoria(opp({ numero_controle_pncp: '2', nicho: 'ti_software', categoria_principal: 'TI' })),
     ).toBe('TI');
+    expect(
+      labelCategoria(opp({ numero_controle_pncp: '3', nicho: 'saude_medicamentos' })),
+    ).toBe('Saúde / medicamentos');
   });
 });
 

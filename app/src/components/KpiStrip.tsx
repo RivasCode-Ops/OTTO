@@ -5,6 +5,8 @@ type Props = {
   totalBanco?: number;
   /** Ex.: "abertas", "prazo ≤7d" — usado no subtítulo dual. */
   prazoRotulo?: string;
+  /** Testes ocultos no recorte — explica diferença vs banner bruto. */
+  nTestesOcultos?: number;
   altaConfianca: number;
   scoreMedio: number;
   orgaosAtivos: number;
@@ -17,6 +19,7 @@ export function KpiStrip({
   total,
   totalBanco,
   prazoRotulo = 'abertas',
+  nTestesOcultos = 0,
   altaConfianca,
   scoreMedio,
   orgaosAtivos,
@@ -24,13 +27,16 @@ export function KpiStrip({
   mudancasRecentes,
   modo = 'geral',
 }: Props) {
+  const notaTestes = nTestesOcultos > 0 ? ' (sem testes)' : '';
   const mostraDual =
     typeof totalBanco === 'number' && totalBanco !== total && prazoRotulo !== 'qualquer prazo';
   const subOportunidades = mostraDual
-    ? `${totalBanco} no banco · ${total} ${prazoRotulo}`
-    : modo === 'ti'
-      ? 'nicho TI · filtro ativo'
-      : 'UF + nicho · filtro ativo';
+    ? `${totalBanco} no banco${notaTestes} · ${total} ${prazoRotulo}`
+    : typeof totalBanco === 'number'
+      ? `${totalBanco} no banco${notaTestes}`
+      : modo === 'ti'
+        ? 'nicho TI · filtro ativo'
+        : 'UF + nicho · filtro ativo';
 
   const items =
     modo === 'ti'

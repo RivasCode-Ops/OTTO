@@ -626,6 +626,13 @@ code {
   color: var(--accent);
 }
 
+.conf-pill--nicho {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  border-color: rgb(20 184 166 / 40%);
+  color: var(--accent);
+}
+
 .conf-pill--baixa {
   color: var(--text-secondary);
 }

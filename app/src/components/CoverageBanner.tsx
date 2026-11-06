@@ -7,9 +7,20 @@ type Props = {
   ordenacaoRotulo: string;
   modo: 'geral' | 'ti';
   escopoUf?: EscopoUf;
+  /** Contagem na lista atual (UF), sem testes se ocultos — alinha ao KPI. */
+  totalEscopoVisivel?: number;
+  /** Quantos registros de teste estão ocultos no recorte UF. */
+  nTestesOcultos?: number;
 };
 
-export function CoverageBanner({ cobertura, ordenacaoRotulo, modo, escopoUf = 'config' }: Props) {
+export function CoverageBanner({
+  cobertura,
+  ordenacaoRotulo,
+  modo,
+  escopoUf = 'config',
+  totalEscopoVisivel,
+  nTestesOcultos = 0,
+}: Props) {
   if (!cobertura) return null;
   const cfg = cobertura.config_coleta;
   const ufs = (cfg.ufs || []).join(', ') || 'não configurada';
@@ -29,16 +40,23 @@ export function CoverageBanner({ cobertura, ordenacaoRotulo, modo, escopoUf = 'c
   )
     .map((u) => String(u).trim().toUpperCase())
     .filter(Boolean);
-  const totalNoEscopo =
+  const totalNoEscopoBruto =
     typeof escopo?.total_no_escopo === 'number'
       ? escopo.total_no_escopo
       : undefined;
+  // Mesma base do KPI quando testes ocultos: totalVisivel (= bruto − testes).
+  const totalExibido =
+    typeof totalEscopoVisivel === 'number' ? totalEscopoVisivel : totalNoEscopoBruto;
+  const notaTestes =
+    nTestesOcultos > 0
+      ? ` (sem ${nTestesOcultos} teste${nTestesOcultos === 1 ? '' : 's'}; ${totalNoEscopoBruto ?? '—'} no SQLite)`
+      : '';
   const rotuloEscopoLista =
     escopoUf === 'todas'
       ? `todas as UFs do banco (${cobertura.banco.total_oportunidades})`
       : escopoUf !== 'config'
-        ? `UF ${String(escopoUf).toUpperCase()} (filtro)`
-        : `UF(s) da coleta${ufsEscopoLista.length ? ` (${ufsEscopoLista.join(', ')})` : ''} — ${totalNoEscopo ?? '—'} no escopo`;
+        ? `UF ${String(escopoUf).toUpperCase()} — ${totalExibido ?? '—'} na lista${notaTestes}`
+        : `UF(s) da coleta${ufsEscopoLista.length ? ` (${ufsEscopoLista.join(', ')})` : ''} — ${totalExibido ?? '—'} no escopo${notaTestes}`;
 
   const dataUlt = ult?.finalizado_em || ult?.iniciado_em || null;
   const idade = diasDesdeColeta(dataUlt);

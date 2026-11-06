@@ -45,14 +45,34 @@ export function isRegistroTeste(o: Oportunidade): boolean {
   );
 }
 
-/** Label de categoria na tabela: nao_classificado → Outros. */
+export const NICHO_LABELS: Record<string, string> = {
+  ti_software: 'TI / software',
+  saude_medicamentos: 'Saúde / medicamentos',
+  obras_engenharia: 'Obras / engenharia',
+  passagens_viagens: 'Passagens / viagens',
+  alimentos_merenda: 'Alimentos / merenda',
+  material_escritorio_papelaria: 'Material de escritório',
+  limpeza_conservacao: 'Limpeza / conservação',
+  veiculos_combustiveis: 'Veículos / combustíveis',
+  outros: 'Outros',
+};
+
+export function labelNicho(nicho: string | null | undefined): string {
+  if (!nicho) return 'Outros';
+  return NICHO_LABELS[nicho] || nicho;
+}
+
+/** Label de categoria/nicho na UI: slugs → rótulo amigável (select Nicho). */
 export function labelCategoria(o: Oportunidade): string {
-  const raw =
-    (o.categoria_principal && o.categoria_principal.trim()) ||
-    (o.nicho && o.nicho.trim()) ||
-    '';
-  if (!raw || raw === 'nao_classificado') return 'Outros';
-  return raw;
+  const cat = (o.categoria_principal && o.categoria_principal.trim()) || '';
+  if (cat && NICHO_LABELS[cat]) return NICHO_LABELS[cat];
+  // Rótulo livre (ex.: "TI") tem prioridade; slug com underscore cai no mapa de nicho.
+  if (cat && cat !== 'nao_classificado' && !/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(cat)) {
+    return cat;
+  }
+  const nicho = (o.nicho && o.nicho.trim()) || '';
+  if (!nicho || nicho === 'nao_classificado') return 'Outros';
+  return labelNicho(nicho);
 }
 
 /**
@@ -163,23 +183,6 @@ export function highlightReason(o: Oportunidade, modo: 'geral' | 'ti' = 'geral')
   if (o.confianca_classificacao === 'alta') parts.push('TI alta confiança');
   else parts.push('TI baixa confiança');
   return parts.slice(0, 3).join(' · ');
-}
-
-export const NICHO_LABELS: Record<string, string> = {
-  ti_software: 'TI / software',
-  saude_medicamentos: 'Saúde / medicamentos',
-  obras_engenharia: 'Obras / engenharia',
-  passagens_viagens: 'Passagens / viagens',
-  alimentos_merenda: 'Alimentos / merenda',
-  material_escritorio_papelaria: 'Material de escritório',
-  limpeza_conservacao: 'Limpeza / conservação',
-  veiculos_combustiveis: 'Veículos / combustíveis',
-  outros: 'Outros',
-};
-
-export function labelNicho(nicho: string | null | undefined): string {
-  if (!nicho) return 'Outros';
-  return NICHO_LABELS[nicho] || nicho;
 }
 
 export function filterOportunidades(

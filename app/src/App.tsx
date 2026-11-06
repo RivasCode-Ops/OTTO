@@ -47,7 +47,7 @@ import {
   filterOportunidades,
   labelNicho,
   pickPriority,
-  resolveKpiTotalBanco,
+  rotuloFiltroPrazo,
   type FiltroPrazo,
 } from './utils';
 
@@ -397,7 +397,7 @@ export function App() {
     [lista, busca, dias, somenteAlta, modo, mostrarTestes, nichoAtivo],
   );
 
-  // KPIs locais (órgãos / TI alta / prazo 7d) seguem UF (lista) + nicho; sem filtro de prazo Abertas.
+  // Recorte UF+nicho no banco (sem prazo) — órgãos / TI alta / prazo≤7.
   const listaParaKpisLocais = useMemo(
     () =>
       filterOportunidades(lista, {
@@ -410,21 +410,28 @@ export function App() {
     [lista, mostrarTestes, nichoAtivo],
   );
 
+  // Card Oportunidades segue o filtro de prazo (alinha à tabela sem busca).
+  const listaKpiComPrazo = useMemo(
+    () =>
+      filterOportunidades(lista, {
+        q: '',
+        dias,
+        somenteAlta: false,
+        ocultarTestes: !mostrarTestes,
+        nicho: nichoAtivo,
+      }),
+    [lista, dias, mostrarTestes, nichoAtivo],
+  );
+
   const extras = useMemo(() => computeKpisExtras(listaParaKpisLocais), [listaParaKpisLocais]);
   const vencendo7 = useMemo(() => countPrazoAte(listaParaKpisLocais, 7), [listaParaKpisLocais]);
   const prioridade = useMemo(
     () => pickPriority(filtradas, 5, { modo, ordenacao }),
     [filtradas, modo, ordenacao],
   );
-  const kpiTotal =
-    nichoAtivo != null
-      ? listaParaKpisLocais.length
-      : resolveKpiTotalBanco({
-          kpisTotal: kpis?.total,
-          coberturaEscopoTotal: cobertura?.escopo_uf?.total_no_escopo,
-          coberturaBancoTotal: cobertura?.banco.total_oportunidades,
-          escopoUf: escopoUf === 'todas' || escopoUf === 'config' ? escopoUf : 'config',
-        });
+  const kpiTotal = listaKpiComPrazo.length;
+  const kpiTotalBanco = listaParaKpisLocais.length;
+  const kpiPrazoRotulo = rotuloFiltroPrazo(dias);
 
   // Contagens do select Nicho: respeitam UF (lista) + prazo ativo.
   const nichoOpcoes = useMemo(() => {
@@ -651,6 +658,8 @@ export function App() {
 
               <KpiStrip
                 total={kpiTotal}
+                totalBanco={kpiTotalBanco}
+                prazoRotulo={kpiPrazoRotulo}
                 altaConfianca={extras.altaConfianca}
                 scoreMedio={extras.scoreMedio}
                 orgaosAtivos={extras.orgaosAtivos}

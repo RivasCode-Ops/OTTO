@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Oportunidade } from './types';
 import {
+  computeKpisExtras,
   countPrazoAte,
   daysUntil,
   filterOportunidades,
@@ -8,6 +9,7 @@ import {
   labelCategoria,
   passaFiltroPrazo,
   resolveKpiTotalBanco,
+  rotuloFiltroPrazo,
 } from './utils';
 
 function opp(partial: Partial<Oportunidade> & { numero_controle_pncp: string }): Oportunidade {
@@ -236,5 +238,34 @@ describe('isRegistroTeste / labelCategoria', () => {
     expect(
       labelCategoria(opp({ numero_controle_pncp: '2', nicho: 'ti_software', categoria_principal: 'TI' })),
     ).toBe('TI');
+  });
+});
+
+describe('computeKpisExtras / rotuloFiltroPrazo', () => {
+  it('TI alta conta só nicho ti_software + confiança alta', () => {
+    const items = [
+      opp({
+        numero_controle_pncp: '1',
+        nicho: 'ti_software',
+        confianca_classificacao: 'alta',
+      }),
+      opp({
+        numero_controle_pncp: '2',
+        nicho: 'saude_medicamentos',
+        confianca_classificacao: 'alta',
+      }),
+      opp({
+        numero_controle_pncp: '3',
+        nicho: 'ti_software',
+        confianca_classificacao: 'baixa',
+      }),
+    ];
+    expect(computeKpisExtras(items).altaConfianca).toBe(1);
+  });
+
+  it('rotuloFiltroPrazo cobre abertas e janelas', () => {
+    expect(rotuloFiltroPrazo('abertas')).toBe('abertas');
+    expect(rotuloFiltroPrazo(7)).toBe('prazo ≤7d');
+    expect(rotuloFiltroPrazo(3650)).toBe('qualquer prazo');
   });
 });

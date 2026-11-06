@@ -206,13 +206,27 @@ export function filterOportunidades(
   });
 }
 
+/** Rótulo curto do filtro de prazo (KPI / subtítulo). */
+export function rotuloFiltroPrazo(dias: FiltroPrazo): string {
+  if (dias === 'abertas') return 'abertas';
+  if (dias === 3650) return 'qualquer prazo';
+  return `prazo ≤${dias}d`;
+}
+
+/**
+ * Extras dos KPIs.
+ * DECISÃO (2026-11-06): "TI alta" = nicho ti_software + confiança alta
+ * (não qualquer setor com confianca_classificacao=alta após multi-nicho).
+ */
 export function computeKpisExtras(items: Oportunidade[]) {
-  const alta = items.filter((o) => o.confianca_classificacao === 'alta');
+  const tiAlta = items.filter(
+    (o) => (o.nicho || '') === 'ti_software' && o.confianca_classificacao === 'alta',
+  );
   const orgaos = new Set(items.map((o) => o.orgao_razao_social));
   const scoreMedio =
     items.length > 0 ? items.reduce((s, o) => s + o.score_total, 0) / items.length : 0;
   return {
-    altaConfianca: alta.length,
+    altaConfianca: tiAlta.length,
     scoreMedio,
     orgaosAtivos: orgaos.size,
   };

@@ -5,8 +5,10 @@ import {
   countPrazoAte,
   daysUntil,
   filterOportunidades,
+  highlightReason,
   isRegistroTeste,
   labelCategoria,
+  labelNicho,
   passaFiltroPrazo,
   resolveKpiTotalBanco,
   rotuloFiltroPrazo,
@@ -241,6 +243,23 @@ describe('isRegistroTeste / labelCategoria', () => {
     expect(
       labelCategoria(opp({ numero_controle_pncp: '3', nicho: 'saude_medicamentos' })),
     ).toBe('Saúde / medicamentos');
+  });
+
+  it('labelNicho e highlightReason usam rótulo amigável no rodapé', () => {
+    expect(labelNicho('saude_medicamentos')).toBe('Saúde / medicamentos');
+    expect(labelNicho('ti_software')).toBe('TI / software');
+    expect(labelNicho('obras_engenharia')).toBe('Obras / engenharia');
+    const why = highlightReason(
+      opp({
+        numero_controle_pncp: '1',
+        nicho: 'saude_medicamentos',
+        data_publicacao: '2026-11-06',
+        data_encerramento: isoOffset(10),
+      }),
+      'geral',
+    );
+    expect(why).toContain('Nicho: Saúde / medicamentos');
+    expect(why).not.toContain('saude_medicamentos');
   });
 });
 

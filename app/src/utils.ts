@@ -169,7 +169,9 @@ export function highlightReason(o: Oportunidade, modo: 'geral' | 'ti' = 'geral')
     const d = daysUntil(o.data_encerramento);
     if (d !== null) parts.push(d <= 7 ? 'Prazo de proposta próximo' : 'Com prazo de proposta');
     else parts.push('Prazo de proposta não informado');
-    if (o.nicho && o.nicho !== 'outros' && o.nicho !== 'nao_classificado') parts.push(`Nicho: ${o.nicho}`);
+    if (o.nicho && o.nicho !== 'outros' && o.nicho !== 'nao_classificado') {
+      parts.push(`Nicho: ${labelNicho(o.nicho)}`);
+    }
     return parts.slice(0, 3).join(' · ');
   }
   const parts: string[] = [];

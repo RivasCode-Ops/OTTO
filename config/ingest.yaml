@@ -1,15 +1,44 @@
-# Coleta PNCP — MVP São Paulo
+# Coleta PNCP — 26 estados + DF (escopo nacional do radar).
+# DECISÃO (2026-11-06): seletor e nichos só fazem sentido com coleta real em todas as UFs;
+# lista vazia por UF = mesmo que não existir a federação no produto.
 ufs:
+  - AC
+  - AL
+  - AP
+  - AM
+  - BA
+  - CE
+  - DF
+  - ES
+  - GO
+  - MA
+  - MT
+  - MS
+  - MG
+  - PA
+  - PB
+  - PR
+  - PE
   - PI
+  - RJ
+  - RN
+  - RS
+  - RO
+  - RR
+  - SC
+  - SP
+  - SE
+  - TO
 
 # Modalidades (Lei 14.133) — 6 = Pregão Eletrônico
 modalidades:
   - 6
 
 tamanho_pagina: 50
-pausa_entre_paginas_seg: 0.3
+# Nacional (27 UFs): pausa/retries um pouco mais conservadores contra 429 do PNCP.
+pausa_entre_paginas_seg: 0.5
 janela_dias_padrao: 7
-max_retries: 3
+max_retries: 5
 
 # Endpoint público de consulta (sem login)
 base_url: https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao

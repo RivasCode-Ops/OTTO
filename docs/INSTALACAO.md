@@ -79,7 +79,7 @@ otto ingest --days 7
 
 Ou pela UI: **Configurações → Coleta PNCP → Atualizar coleta agora** (janela 2 / 7 / 14 dias). Só uma coleta por vez.
 
-UF e modalidade padrão: `config/ingest.yaml` (V1: PI, pregão eletrônico).
+UF e modalidade padrão: `config/ingest.yaml` (27 UFs + pregão eletrônico).
 
 Agendamento Windows (opcional): [AGENDADOR-WINDOWS.md](AGENDADOR-WINDOWS.md).
 
@@ -96,7 +96,10 @@ Agendamento Windows (opcional): [AGENDADOR-WINDOWS.md](AGENDADOR-WINDOWS.md).
 
 **Não** commitar `.env`, `data/*.db`, `logs/`, `node_modules/`.
 
-Backup pela UI: Configurações → Criar backup. Restauração **operacional** (substituir `otto.db`) não está na UI — procedimento restrito.
+Backup pela UI: Configurações → Criar backup. Restauração em cópia isolada valida o zip sem
+tocar o banco. Restauração **operacional** (substituir `otto.db` + documentos): Configurações →
+«Restaurar no banco operacional…» → digitar `SUBSTITUIR-BANCO-OPERACIONAL`. Antes, o sistema
+cria um backup automático de segurança.
 
 ---
 

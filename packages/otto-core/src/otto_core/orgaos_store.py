@@ -18,9 +18,19 @@ from typing import Any
 
 from otto_core.models import Oportunidade
 
-# Mapeamento do nicho legado → classificação multissetorial (não restringe a lista).
+# DECISÃO (2026-11-06): §12.2 — prioridade local explicável (frequência, categorias,
+# valores/período, resultados do usuário, condições operacionais). Sem reputação.
+
+# Mapeamento nicho (coluna oportunidades) → classificação multissetorial.
 NICHO_PARA_SETOR: dict[str, tuple[str, str, str]] = {
     "ti_software": ("ti", "software_e_servicos", ""),
+    "saude_medicamentos": ("saude_medicamentos", "medicamentos_hospitalar", ""),
+    "obras_engenharia": ("obras_engenharia", "obras_e_reforma", ""),
+    "passagens_viagens": ("passagens_viagens", "agenciamento", ""),
+    "alimentos_merenda": ("alimentos_merenda", "merenda_e_generos", ""),
+    "material_escritorio_papelaria": ("material_escritorio_papelaria", "expediente", ""),
+    "limpeza_conservacao": ("limpeza_conservacao", "limpeza", ""),
+    "veiculos_combustiveis": ("veiculos_combustiveis", "frota_e_combustivel", ""),
     "outros": ("outros", "nao_classificado", ""),
 }
 
@@ -208,6 +218,150 @@ def ensure_classificacoes_basicas(conn: sqlite3.Connection) -> int:
     return criadas
 
 
+def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (name,),
+    ).fetchone()
+    return row is not None
+
+
+def _dias_desde_iso(iso: str | None) -> int | None:
+    if not iso:
+        return None
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", iso.strip())
+    if not m:
+        return None
+    try:
+        dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    return (hoje - dt.replace(hour=0, minute=0, second=0, microsecond=0)).days
+
+
+def _prazo_ainda_aberto(iso: str | None) -> bool:
+    """True se data_encerramento é hoje ou futura (civil local)."""
+    d = _dias_desde_iso(iso)
+    if d is None:
+        return False
+    return d <= 0  # dias desde encerramento ≤ 0 ⇒ ainda não passou / é hoje
+
+
+def calcular_prioridade_orgao(
+    *,
+    n_oportunidades: int,
+    n_setores: int,
+    valor_estimado_soma: float | None,
+    data_max_publicacao: str | None,
+    n_abertas: int,
+    n_interesse_ou_salva: int,
+    n_participacao: int,
+    n_resultado: int,
+    tem_anotacao: bool,
+) -> dict[str, Any]:
+    """§12.2 — score local + motivos explícitos. Sem reputação."""
+    score = 0
+    motivos: list[str] = []
+
+    pts_freq = min(40, max(0, n_oportunidades) * 4)
+    if pts_freq:
+        score += pts_freq
+        motivos.append(f"{n_oportunidades} oportunidade(s) no banco local")
+
+    pts_cat = min(15, max(0, n_setores) * 5)
+    if pts_cat:
+        score += pts_cat
+        motivos.append(f"{n_setores} setor(es)/categoria(s) observados")
+
+    if valor_estimado_soma is not None and valor_estimado_soma > 0:
+        score += 10
+        motivos.append("Há valor estimado informado em ao menos uma compra")
+
+    dias = _dias_desde_iso(data_max_publicacao)
+    if dias is not None and dias <= 30:
+        score += 10
+        motivos.append("Publicação recente (≤30 dias)")
+
+    if n_abertas > 0:
+        score += min(10, n_abertas * 2)
+        motivos.append(f"{n_abertas} com prazo de proposta ainda aberto")
+
+    if n_interesse_ou_salva > 0:
+        score += min(15, n_interesse_ou_salva * 5)
+        motivos.append(f"{n_interesse_ou_salva} marcada(s) com interesse/salva por você")
+
+    if n_participacao > 0:
+        score += min(20, n_participacao * 10)
+        motivos.append(
+            f"{n_participacao} no seu fluxo de participação/acompanhamento"
+        )
+
+    if n_resultado > 0:
+        score += min(15, n_resultado * 5)
+        motivos.append(f"{n_resultado} com resultado registrado por você")
+
+    if tem_anotacao:
+        score += 5
+        motivos.append("Há anotação local neste órgão")
+
+    if not motivos:
+        motivos.append("Sem sinais além da presença no banco")
+
+    return {
+        "prioridade_score": score,
+        "motivos_prioridade": motivos,
+    }
+
+
+def _sinais_usuario_por_numero(conn: sqlite3.Connection) -> dict[str, dict[str, int]]:
+    """Mapa numero_controle_pncp → contagens de acompanhamento/fluxo do usuário."""
+    out: dict[str, dict[str, int]] = {}
+
+    def bucket(num: str) -> dict[str, int]:
+        b = out.get(num)
+        if not b:
+            b = {"interesse_salva": 0, "participacao": 0, "resultado": 0}
+            out[num] = b
+        return b
+
+    if _table_exists(conn, "oportunidade_acompanhamento"):
+        for r in conn.execute(
+            """
+            SELECT numero_controle_pncp, salva, interesse, decisao
+            FROM oportunidade_acompanhamento
+            """
+        ):
+            b = bucket(r["numero_controle_pncp"])
+            if int(r["salva"] or 0) or int(r["interesse"] or 0):
+                b["interesse_salva"] = 1
+            elif (r["decisao"] or "sem_decisao") != "sem_decisao":
+                b["interesse_salva"] = 1
+
+    if _table_exists(conn, "oportunidade_fluxo"):
+        estados_part = {
+            "participacao_registrada",
+            "em_acompanhamento",
+            "em_preparacao",
+            "aguardando_informacoes",
+            "em_analise",
+        }
+        for r in conn.execute(
+            """
+            SELECT numero_controle_pncp, estado_fluxo, resultado_disputa
+            FROM oportunidade_fluxo
+            """
+        ):
+            b = bucket(r["numero_controle_pncp"])
+            est = r["estado_fluxo"] or ""
+            if est in estados_part or est == "encerrada":
+                b["participacao"] = 1
+            rd = r["resultado_disputa"] or "nao_informado"
+            if rd not in ("", "nao_informado"):
+                b["resultado"] = 1
+    return out
+
+
 def list_orgaos(
     conn: sqlite3.Connection,
     *,
@@ -227,6 +381,7 @@ def list_orgaos(
     for cl in conn.execute("SELECT numero_controle_pncp, setor FROM oportunidade_classificacoes"):
         setores_por_opp.setdefault(cl["numero_controle_pncp"], set()).add(cl["setor"])
 
+    sinais_num = _sinais_usuario_por_numero(conn)
     nome_para_cnpj = _mapa_nome_para_cnpj(rows)
     buckets: dict[str, dict[str, Any]] = {}
     for r in rows:
@@ -249,6 +404,10 @@ def list_orgaos(
                 "valor_estimado_n": 0,
                 "data_min": None,
                 "data_max": None,
+                "n_abertas": 0,
+                "n_interesse_ou_salva": 0,
+                "n_participacao": 0,
+                "n_resultado": 0,
             }
             buckets[chave] = b
         else:
@@ -272,12 +431,37 @@ def list_orgaos(
             if b["data_max"] is None or dp > b["data_max"]:
                 b["data_max"] = dp
         b["setores"].update(setores_por_opp.get(r["numero_controle_pncp"], set()))
+        if _prazo_ainda_aberto(r["data_encerramento"] if "data_encerramento" in r.keys() else None):
+            b["n_abertas"] += 1
+        sig = sinais_num.get(r["numero_controle_pncp"])
+        if sig:
+            b["n_interesse_ou_salva"] += sig["interesse_salva"]
+            b["n_participacao"] += sig["participacao"]
+            b["n_resultado"] += sig["resultado"]
 
     items = []
     qn = (q or "").strip().lower()
     for b in buckets.values():
         if qn and qn not in (b["nome"] or "").lower() and qn not in (b["cnpj"] or ""):
             continue
+        an = _buscar_anotacao(
+            conn, b["orgao_chave"], cnpj=b.get("cnpj"), nome=b.get("nome")
+        )
+        tem_anotacao = bool(an and (an["anotacoes"] or "").strip())
+        valor = (
+            round(b["valor_estimado_soma"], 2) if b["valor_estimado_n"] else None
+        )
+        pri = calcular_prioridade_orgao(
+            n_oportunidades=b["n_oportunidades"],
+            n_setores=len(b["setores"]),
+            valor_estimado_soma=valor,
+            data_max_publicacao=b["data_max"],
+            n_abertas=b["n_abertas"],
+            n_interesse_ou_salva=b["n_interesse_ou_salva"],
+            n_participacao=b["n_participacao"],
+            n_resultado=b["n_resultado"],
+            tem_anotacao=tem_anotacao,
+        )
         items.append(
             {
                 "orgao_chave": b["orgao_chave"],
@@ -287,20 +471,22 @@ def list_orgaos(
                 "municipios": sorted(b["municipios"])[:8],
                 "n_oportunidades": b["n_oportunidades"],
                 "setores_observados": sorted(b["setores"]),
-                "valor_estimado_soma": round(b["valor_estimado_soma"], 2)
-                if b["valor_estimado_n"]
-                else None,
+                "valor_estimado_soma": valor,
                 "periodo_publicacao": {"de": b["data_min"], "ate": b["data_max"]},
+                "tem_anotacao": tem_anotacao,
+                "prioridade_score": pri["prioridade_score"],
+                "motivos_prioridade": pri["motivos_prioridade"],
             }
         )
-    items.sort(key=lambda x: (-x["n_oportunidades"], x["nome"] or ""))
+    items.sort(
+        key=lambda x: (
+            -int(x["prioridade_score"]),
+            -int(x["n_oportunidades"]),
+            x["nome"] or "",
+        )
+    )
     total = len(items)
     page = items[offset : offset + limit]
-    for it in page:
-        an = _buscar_anotacao(
-            conn, it["orgao_chave"], cnpj=it.get("cnpj"), nome=it.get("nome")
-        )
-        it["tem_anotacao"] = bool(an and (an["anotacoes"] or "").strip())
 
     return {
         "items": page,
@@ -311,13 +497,15 @@ def list_orgaos(
             "Órgãos derivados das oportunidades já coletadas neste computador. "
             "CNPJ é normalizado (só dígitos); a mesma razão social sem CNPJ une-se ao "
             "CNPJ já visto em outra oportunidade. Nomes só parecidos não são unidos. "
-            "Prioridade = frequência nos dados locais — não é reputação."
+            "Prioridade (§12.2) = sinais locais explicáveis (frequência, categorias, "
+            "valores/período, seu acompanhamento e resultados) — não é reputação."
         ),
         "limitacoes": [
             "Base: apenas oportunidades presentes no SQLite local.",
             "CNPJ: orgaoEntidade / unidadeOrgao / campos soltos do JSON PNCP, quando existirem.",
             "Sem fusão fuzzy de nomes distintos (ex.: Pref. vs Prefeitura).",
             "Sem dados de participantes/vencedores nesta coleta.",
+            "Prioridade não indica boa ou má reputação do órgão.",
         ],
     }
 
@@ -394,7 +582,8 @@ def get_orgao(conn: sqlite3.Connection, orgao_chave: str) -> dict[str, Any] | No
         },
         "aviso": (
             "Detalhe montado só com dados locais. Valores são os informados na coleta "
-            "(estimados quando houver). Não há ranking de reputação."
+            "(estimados quando houver). Prioridade lista motivos observáveis — "
+            "não é ranking de reputação."
         ),
     }
 
@@ -475,27 +664,35 @@ def add_classificacao(
 
 
 def visao_categorias(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Visão por nicho (coluna oportunidades) — clique na UI aplica filtro na lista."""
+    from otto_core.niche import NICHOS_LABELS
+
     ensure_classificacoes_basicas(conn)
     rows = conn.execute(
         """
-        SELECT setor, categoria, COUNT(*) AS c
-        FROM oportunidade_classificacoes
-        GROUP BY setor, categoria
+        SELECT COALESCE(nicho, 'outros') AS setor, COUNT(*) AS c
+        FROM oportunidades
+        GROUP BY COALESCE(nicho, 'outros')
         ORDER BY c DESC
         """
     ).fetchall()
     return {
         "items": [
-            {"setor": r["setor"], "categoria": r["categoria"], "quantidade": int(r["c"])}
+            {
+                "setor": r["setor"],
+                "categoria": NICHOS_LABELS.get(str(r["setor"]), str(r["setor"])),
+                "nicho": r["setor"],
+                "quantidade": int(r["c"]),
+            }
             for r in rows
         ],
         "aviso": (
-            "Classificação multissetorial local. O nicho TI legado alimenta o setor 'ti' "
-            "automaticamente, mas a lista geral não fica restrita a TI."
+            "Categorias = nichos do classificador local (regras sobre objeto/órgão). "
+            "Clique num setor para filtrar a Lista geral."
         ),
         "limitacoes": [
-            "Setor 'outros/nao_classificado' é residual do classificador atual.",
-            "Revisão manual pelo usuário tem origem=usuario.",
+            "Setor 'outros' é residual (sem regra forte).",
+            "Revisão manual (origem=usuario) não é sobrescrita na reclassificação.",
         ],
     }
 

@@ -58,6 +58,9 @@ class PncpClient:
                 with httpx.Client(timeout=60.0) as client:
                     r = client.get(self.base_url, params=params)
                     if r.status_code == 429:
+                        last_err = RuntimeError(
+                            f"HTTP 429 Too Many Requests (tentativa {attempt + 1}/{self.max_retries})"
+                        )
                         time.sleep(2 ** attempt)
                         continue
                     r.raise_for_status()

@@ -14,6 +14,12 @@ const base = '';
 
 export type ModoLista = 'geral' | 'ti';
 export type OrdenacaoLista = 'publicacao' | 'prazo';
+/**
+ * config = UFs do ingest.yaml (coleta);
+ * todas = banco inteiro;
+ * UF (ex. PI) = filtro explícito de uma UF.
+ */
+export type EscopoUf = 'config' | 'todas' | string;
 
 export type ListaOportunidadesMeta = {
   items: Oportunidade[];
@@ -51,10 +57,25 @@ async function ensureOk(r: Response, fallback: string): Promise<void> {
   if (!r.ok) throw new Error(await apiErrorMessage(r, fallback));
 }
 
-function paramsModo(modo: ModoLista): URLSearchParams {
+function paramsModo(
+  modo: ModoLista,
+  escopoUf: EscopoUf = 'config',
+  nicho?: string | null,
+): URLSearchParams {
   const q = new URLSearchParams();
-  if (modo === 'ti') {
+  if (nicho) {
+    q.set('nicho', nicho);
+  } else if (modo === 'ti') {
     q.set('nicho', 'ti_software');
+  }
+  const escopo = (escopoUf || 'config').trim();
+  if (escopo === 'todas') {
+    q.set('escopo_uf', 'todas');
+  } else if (escopo === 'config') {
+    q.set('escopo_uf', 'config');
+  } else {
+    q.set('uf', escopo.toUpperCase());
+    q.set('escopo_uf', 'config');
   }
   return q;
 }
@@ -65,8 +86,13 @@ export async function fetchCobertura(signal?: AbortSignal): Promise<Cobertura> {
   return r.json() as Promise<Cobertura>;
 }
 
-export async function fetchKpis(modo: ModoLista = 'geral', signal?: AbortSignal): Promise<Kpis> {
-  const q = paramsModo(modo);
+export async function fetchKpis(
+  modo: ModoLista = 'geral',
+  signal?: AbortSignal,
+  escopoUf: EscopoUf = 'config',
+  nicho?: string | null,
+): Promise<Kpis> {
+  const q = paramsModo(modo, escopoUf, nicho);
   const r = await fetch(`${base}/api/kpis?${q}`, { signal });
   await ensureOk(r, 'Falha ao carregar KPIs');
   return r.json() as Promise<Kpis>;
@@ -78,6 +104,7 @@ export async function fetchOportunidades(
   modo: ModoLista = 'geral',
   ordenacao: OrdenacaoLista = 'publicacao',
   signal?: AbortSignal,
+  escopoUf: EscopoUf = 'config',
 ): Promise<ListaOportunidadesMeta> {
   const items: Oportunidade[] = [];
   let offset = 0;
@@ -91,7 +118,7 @@ export async function fetchOportunidades(
       : 'Publicação mais recente';
 
   for (;;) {
-    const q = paramsModo(modo);
+    const q = paramsModo(modo, escopoUf);
     q.set('ordenacao', ordenacao);
     q.set('limit', String(PAGE_SIZE));
     q.set('offset', String(offset));
@@ -127,8 +154,9 @@ export async function fetchOportunidades(
 export async function fetchEventosRecentes(
   modo: ModoLista = 'geral',
   signal?: AbortSignal,
+  escopoUf: EscopoUf = 'config',
 ): Promise<EventosRecentes> {
-  const q = paramsModo(modo);
+  const q = paramsModo(modo, escopoUf);
   q.set('days', '7');
   q.set('limit', '8');
   const r = await fetch(`${base}/api/eventos/recentes?${q}`, { signal });
@@ -136,8 +164,16 @@ export async function fetchEventosRecentes(
   return r.json() as Promise<EventosRecentes>;
 }
 
-export async function fetchAlertas(desde?: string, signal?: AbortSignal): Promise<AlertasResposta> {
-  const q = new URLSearchParams({ nicho: 'ti_software', confianca: 'alta' });
+export async function fetchAlertas(
+  desde?: string,
+  signal?: AbortSignal,
+  escopoUf: EscopoUf = 'config',
+): Promise<AlertasResposta> {
+  const q = new URLSearchParams({
+    nicho: 'ti_software',
+    confianca: 'alta',
+    escopo_uf: escopoUf,
+  });
   if (desde) q.set('desde', desde);
   const r = await fetch(`${base}/api/alertas?${q}`, { signal });
   await ensureOk(r, 'Falha ao carregar alertas');
@@ -298,6 +334,27 @@ export async function restoreBackupCopy(nome: string): Promise<{ aviso: string; 
   return r.json();
 }
 
+export const CONFIRMACAO_RESTORE_OPERACIONAL = 'SUBSTITUIR-BANCO-OPERACIONAL';
+
+export async function restoreBackupOperacional(
+  nome: string,
+  confirmacao: string,
+): Promise<{
+  ok: boolean;
+  aviso: string;
+  backup_seguranca: string;
+  oportunidades: number;
+}> {
+  const q = new URLSearchParams({ nome });
+  const r = await fetch(`${base}/api/backup/restaurar-operacional?${q}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmacao }),
+  });
+  await ensureOk(r, 'Falha no restore operacional');
+  return r.json();
+}
+
 export async function fetchOrgaos(opts?: { q?: string; uf?: string; limit?: number }) {
   const q = new URLSearchParams();
   if (opts?.q) q.set('q', opts.q);
@@ -315,6 +372,9 @@ export async function fetchOrgaos(opts?: { q?: string; uf?: string; limit?: numb
       setores_observados: string[];
       valor_estimado_soma?: number | null;
       periodo_publicacao?: { de?: string | null; ate?: string | null };
+      tem_anotacao?: boolean;
+      prioridade_score?: number;
+      motivos_prioridade?: string[];
     }[];
     total: number;
     aviso: string;
@@ -333,6 +393,8 @@ export async function fetchOrgao(chave: string) {
       ufs: string[];
       valor_estimado_soma?: number | null;
       periodo_publicacao?: { de?: string | null; ate?: string | null };
+      prioridade_score?: number;
+      motivos_prioridade?: string[];
     };
     categorias_observadas: { rotulo: string; quantidade: number }[];
     oportunidades: {
@@ -435,7 +497,11 @@ export async function fetchConfiguracoes() {
     docx: boolean;
     download_automatico_anexos: boolean;
     perfil_obrigatorio: boolean;
-    restore_operacional: { disponivel_na_ui: boolean; procedimento: string };
+    restore_operacional: {
+      disponivel_na_ui: boolean;
+      procedimento: string;
+      confirmacao_exigida?: string;
+    };
     cobertura: unknown;
     aviso: string;
   }>;
@@ -866,6 +932,21 @@ export async function checklistFromRequisito(numero: string, reqId: number): Pro
     method: 'POST',
   });
   await ensureOk(r, 'Falha ao criar tarefa a partir do requisito');
+}
+
+export async function fetchEspecializacao(numero: string) {
+  const r = await fetch(oppPath(numero, '/especializacao'));
+  await ensureOk(r, 'Falha especialização');
+  return r.json() as Promise<{
+    especializacao: 'saude' | 'viagens' | null;
+    rotulo?: string | null;
+    nicho?: string | null;
+    nicho_rotulo?: string | null;
+    subtipos: { id: string; rotulo: string; sinais: string[]; fonte: string }[];
+    condicoes_mencionadas: { id: string; rotulo: string; sinais: string[]; fonte: string }[];
+    aviso: string;
+    limitacoes: string[];
+  }>;
 }
 
 export async function fetchClassificacoes(numero: string) {

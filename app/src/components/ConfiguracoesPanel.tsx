@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  CONFIRMACAO_RESTORE_OPERACIONAL,
   createBackup,
   fetchAprendizado,
   fetchAuditoria,
@@ -7,6 +8,7 @@ import {
   fetchIngestStatus,
   listBackups,
   restoreBackupCopy,
+  restoreBackupOperacional,
   startIngest,
   type AprendizadoResumo,
   type IngestStatus,
@@ -53,6 +55,9 @@ export function ConfiguracoesPanel() {
   const [ingest, setIngest] = useState<IngestStatus | null>(null);
   const [ingestDays, setIngestDays] = useState(7);
   const [ingestBusy, setIngestBusy] = useState(false);
+  const [restoreOpNome, setRestoreOpNome] = useState<string | null>(null);
+  const [restoreOpConfirm, setRestoreOpConfirm] = useState('');
+  const [restoreOpBusy, setRestoreOpBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -134,6 +139,25 @@ export function ConfiguracoesPanel() {
     }
   }
 
+  async function doRestoreOperacional() {
+    if (!restoreOpNome) return;
+    setErro('');
+    setMsg('');
+    setRestoreOpBusy(true);
+    try {
+      const r = await restoreBackupOperacional(restoreOpNome, restoreOpConfirm.trim());
+      setMsg(r.aviso || 'Restore operacional concluído.');
+      setRestoreOpNome(null);
+      setRestoreOpConfirm('');
+      const b = await listBackups();
+      setBackups(b.items);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha no restore operacional');
+    } finally {
+      setRestoreOpBusy(false);
+    }
+  }
+
   if (!cfg && !erro) return <p className="muted">Carregando configurações…</p>;
 
   return (
@@ -198,9 +222,71 @@ export function ConfiguracoesPanel() {
                 <button type="button" className="btn btn--ghost" onClick={() => void doRestore(b.nome)}>
                   Restaurar em cópia isolada
                 </button>
+                {cfg.restore_operacional.disponivel_na_ui ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => {
+                      setRestoreOpNome(b.nome);
+                      setRestoreOpConfirm('');
+                      setErro('');
+                    }}
+                  >
+                    Restaurar no banco operacional…
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
+          {restoreOpNome && cfg.restore_operacional.disponivel_na_ui ? (
+            <div className="drawer__block" style={{ marginTop: '0.75rem' }}>
+              <h4>Confirmar restore operacional</h4>
+              <p className="drawer__hint">
+                Vai substituir <code>otto.db</code> e a pasta documentos pelo backup{' '}
+                <strong>{restoreOpNome}</strong>. Um backup automático de segurança será criado
+                antes. Digite exatamente:{' '}
+                <code>
+                  {cfg.restore_operacional.confirmacao_exigida || CONFIRMACAO_RESTORE_OPERACIONAL}
+                </code>
+              </p>
+              <label className="acomp__label">
+                Confirmação
+                <input
+                  value={restoreOpConfirm}
+                  onChange={(e) => setRestoreOpConfirm(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={restoreOpBusy}
+                />
+              </label>
+              <div className="acomp__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={
+                    restoreOpBusy ||
+                    restoreOpConfirm.trim() !==
+                      (cfg.restore_operacional.confirmacao_exigida ||
+                        CONFIRMACAO_RESTORE_OPERACIONAL)
+                  }
+                  onClick={() => void doRestoreOperacional()}
+                >
+                  {restoreOpBusy ? 'Restaurando…' : 'Substituir banco operacional'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  disabled={restoreOpBusy}
+                  onClick={() => {
+                    setRestoreOpNome(null);
+                    setRestoreOpConfirm('');
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <h3>Coleta PNCP</h3>
           <p className="drawer__hint">

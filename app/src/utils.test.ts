@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Oportunidade } from './types';
 import {
+  computeKpisExtras,
   countPrazoAte,
   daysUntil,
   filterOportunidades,
+  highlightReason,
   isRegistroTeste,
   labelCategoria,
+  labelNicho,
   passaFiltroPrazo,
+  resolveKpiTotalBanco,
+  rotuloFiltroPrazo,
 } from './utils';
 
 function opp(partial: Partial<Oportunidade> & { numero_controle_pncp: string }): Oportunidade {
@@ -27,7 +32,6 @@ function isoOffset(days: number): string {
   const d = new Date();
   d.setHours(12, 0, 0, 0);
   d.setDate(d.getDate() + days);
-  // Data local YYYY-MM-DD (evita fuso UTC do toISOString).
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -45,6 +49,65 @@ describe('daysUntil', () => {
     expect(daysUntil(isoOffset(0))).toBe(0);
     expect(daysUntil(isoOffset(7))).toBe(7);
     expect(daysUntil(isoOffset(-3))).toBe(-3);
+  });
+});
+
+describe('resolveKpiTotalBanco', () => {
+  it('prioriza total de /api/kpis e nunca usa length da lista', () => {
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: 243,
+        coberturaEscopoTotal: 243,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'config',
+      }),
+    ).toBe(243);
+    expect(resolveKpiTotalBanco({ kpisTotal: 888 })).not.toBe(500);
+    expect(resolveKpiTotalBanco({})).toBe(0);
+  });
+
+  it('com escopo config não cai no banco inteiro; corrige KPI global vs escopo menor', () => {
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: 1025,
+        coberturaEscopoTotal: 243,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'config',
+      }),
+    ).toBe(243);
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: null,
+        coberturaEscopoTotal: 243,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'config',
+      }),
+    ).toBe(243);
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: null,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'config',
+      }),
+    ).toBe(0);
+  });
+
+  it('escopo todas usa total do banco', () => {
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: 1025,
+        coberturaEscopoTotal: 243,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'todas',
+      }),
+    ).toBe(1025);
+    expect(
+      resolveKpiTotalBanco({
+        kpisTotal: null,
+        coberturaBancoTotal: 1025,
+        escopoUf: 'todas',
+      }),
+    ).toBe(1025);
   });
 });
 
@@ -79,25 +142,48 @@ describe('passaFiltroPrazo / filterOportunidades', () => {
     expect(passaFiltroPrazo(semPrazo, 7)).toBe(false);
   });
 
-  it('qualquer prazo (3650) exclui só vencidas', () => {
+  it('qualquer prazo (3650) inclui vencidas e sem prazo', () => {
     expect(passaFiltroPrazo(longe, 3650)).toBe(true);
     expect(passaFiltroPrazo(semPrazo, 3650)).toBe(true);
-    expect(passaFiltroPrazo(vencida, 3650)).toBe(false);
+    expect(passaFiltroPrazo(vencida, 3650)).toBe(true);
+    expect(passaFiltroPrazo(futura, 3650)).toBe(true);
   });
 
-  it('filterOportunidades aplica prazo + busca + oculta testes', () => {
-    const teste = opp({
+  it('filterOportunidades oculta testes (objeto e MANUAL-) por padrão', () => {
+    const testeObj = opp({
       numero_controle_pncp: 'T',
       origem_registro: 'manual',
       objeto_compra: 'TESTE ruido',
       data_encerramento: isoOffset(3),
     });
-    const out = filterOportunidades([futura, vencida, semPrazo, teste], {
+    const testeManual = opp({
+      numero_controle_pncp: 'MANUAL-ABC',
+      origem_registro: 'manual',
+      objeto_compra: 'Cadastro realista',
+      data_encerramento: isoOffset(3),
+    });
+    const out = filterOportunidades([futura, vencida, semPrazo, testeObj, testeManual], {
       q: '',
       dias: 'abertas',
       somenteAlta: false,
     });
     expect(out.map((o) => o.numero_controle_pncp).sort()).toEqual(['A', 'C']);
+  });
+
+  it('filterOportunidades pode mostrar testes com ocultarTestes=false', () => {
+    const testeManual = opp({
+      numero_controle_pncp: 'MANUAL-XYZ',
+      origem_registro: 'manual',
+      objeto_compra: 'Qualquer',
+      data_encerramento: isoOffset(2),
+    });
+    const out = filterOportunidades([futura, testeManual], {
+      q: '',
+      dias: 'abertas',
+      somenteAlta: false,
+      ocultarTestes: false,
+    });
+    expect(out.map((o) => o.numero_controle_pncp).sort()).toEqual(['A', 'MANUAL-XYZ']);
   });
 
   it('countPrazoAte alinha ao KPI de 7 dias', () => {
@@ -106,7 +192,16 @@ describe('passaFiltroPrazo / filterOportunidades', () => {
 });
 
 describe('isRegistroTeste / labelCategoria', () => {
-  it('detecta manuais de teste', () => {
+  it('detecta MANUAL- e manuais de teste por objeto', () => {
+    expect(
+      isRegistroTeste(
+        opp({
+          numero_controle_pncp: 'MANUAL-1',
+          origem_registro: 'manual',
+          objeto_compra: 'Sem palavra teste',
+        }),
+      ),
+    ).toBe(true);
     expect(
       isRegistroTeste(
         opp({
@@ -145,5 +240,54 @@ describe('isRegistroTeste / labelCategoria', () => {
     expect(
       labelCategoria(opp({ numero_controle_pncp: '2', nicho: 'ti_software', categoria_principal: 'TI' })),
     ).toBe('TI');
+    expect(
+      labelCategoria(opp({ numero_controle_pncp: '3', nicho: 'saude_medicamentos' })),
+    ).toBe('Saúde / medicamentos');
+  });
+
+  it('labelNicho e highlightReason usam rótulo amigável no rodapé', () => {
+    expect(labelNicho('saude_medicamentos')).toBe('Saúde / medicamentos');
+    expect(labelNicho('ti_software')).toBe('TI / software');
+    expect(labelNicho('obras_engenharia')).toBe('Obras / engenharia');
+    const why = highlightReason(
+      opp({
+        numero_controle_pncp: '1',
+        nicho: 'saude_medicamentos',
+        data_publicacao: '2026-11-06',
+        data_encerramento: isoOffset(10),
+      }),
+      'geral',
+    );
+    expect(why).toContain('Nicho: Saúde / medicamentos');
+    expect(why).not.toContain('saude_medicamentos');
+  });
+});
+
+describe('computeKpisExtras / rotuloFiltroPrazo', () => {
+  it('TI alta conta só nicho ti_software + confiança alta', () => {
+    const items = [
+      opp({
+        numero_controle_pncp: '1',
+        nicho: 'ti_software',
+        confianca_classificacao: 'alta',
+      }),
+      opp({
+        numero_controle_pncp: '2',
+        nicho: 'saude_medicamentos',
+        confianca_classificacao: 'alta',
+      }),
+      opp({
+        numero_controle_pncp: '3',
+        nicho: 'ti_software',
+        confianca_classificacao: 'baixa',
+      }),
+    ];
+    expect(computeKpisExtras(items).altaConfianca).toBe(1);
+  });
+
+  it('rotuloFiltroPrazo cobre abertas e janelas', () => {
+    expect(rotuloFiltroPrazo('abertas')).toBe('abertas');
+    expect(rotuloFiltroPrazo(7)).toBe('prazo ≤7d');
+    expect(rotuloFiltroPrazo(3650)).toBe('qualquer prazo');
   });
 });

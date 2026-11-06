@@ -35,6 +35,94 @@ class IngestParamsError(ValueError):
     """days/uf inválidos."""
 
 
+def _upsert_lote(
+    conn: sqlite3.Connection, raw_items: list[dict[str, Any]]
+) -> tuple[int, int, int]:
+    novos = 0
+    atualizados = 0
+    erros = 0
+    for raw in raw_items:
+        try:
+            is_new, _ = upsert_oportunidade(conn, raw)
+            if is_new:
+                novos += 1
+            else:
+                atualizados += 1
+        except Exception:
+            erros += 1
+    return novos, atualizados, erros
+
+
+def _mensagem_final(
+    *,
+    total_bruto: int,
+    falhas_uf: list[str],
+) -> tuple[str, str]:
+    """Retorna (status, mensagem) para ingest_runs / resposta."""
+    if falhas_uf and total_bruto == 0:
+        detail = "; ".join(falhas_uf)[:450]
+        return "erro", f"erro: todas as UFs falharam: {detail}"
+    if falhas_uf:
+        detail = "; ".join(falhas_uf)[:450]
+        return "ok_parcial", f"ok_parcial: {detail}"
+    return "ok", "ok"
+
+
+def _coletar_e_persistir(
+    conn: sqlite3.Connection,
+    *,
+    cfg: dict[str, Any],
+    days: int,
+    ufs: list[str],
+    modalidades: list[int],
+    collect_fn: CollectFn | None,
+) -> dict[str, Any]:
+    """
+    DECISÃO (2026-11-06): com PNCP real, coleta e grava **por UF**.
+    Falha numa federação não apaga o progresso das anteriores (nacional ≠ tudo-ou-nada).
+    `collect_fn` (testes) mantém o lote único.
+    """
+    novos = 0
+    atualizados = 0
+    erros = 0
+    total_bruto = 0
+    falhas_uf: list[str] = []
+
+    if collect_fn is not None:
+        raw_items = collect_fn(days=days, ufs=ufs, modalidades=modalidades)
+        total_bruto = len(raw_items)
+        n, a, e = _upsert_lote(conn, raw_items)
+        novos, atualizados, erros = n, a, e
+        conn.commit()
+    else:
+        client = PncpClient(cfg)
+        for uf in ufs:
+            try:
+                batch = client.collect_window(
+                    days=days, ufs=[uf], modalidades=modalidades
+                )
+                total_bruto += len(batch)
+                n, a, e = _upsert_lote(conn, batch)
+                novos += n
+                atualizados += a
+                erros += e
+                conn.commit()
+            except Exception as exc:
+                falhas_uf.append(f"{uf}:{exc}")
+                conn.commit()
+
+    status, mensagem = _mensagem_final(total_bruto=total_bruto, falhas_uf=falhas_uf)
+    return {
+        "status": status,
+        "mensagem": mensagem,
+        "total_bruto": total_bruto,
+        "total_novos": novos,
+        "total_atualizados": atualizados,
+        "erros": erros,
+        "falhas_uf": falhas_uf,
+    }
+
+
 def _normalizar_params(
     days: int | None,
     uf: str | None,
@@ -132,25 +220,14 @@ def executar_coleta(
     conn.commit()
 
     try:
-        if collect_fn is not None:
-            raw_items = collect_fn(days=d, ufs=ufs, modalidades=modalidades)
-        else:
-            client = PncpClient(cfg)
-            raw_items = client.collect_window(days=d, ufs=ufs, modalidades=modalidades)
-
-        novos = 0
-        atualizados = 0
-        erros = 0
-        for raw in raw_items:
-            try:
-                is_new, _ = upsert_oportunidade(conn, raw)
-                if is_new:
-                    novos += 1
-                else:
-                    atualizados += 1
-            except Exception:
-                erros += 1
-
+        resultado = _coletar_e_persistir(
+            conn,
+            cfg=cfg,
+            days=d,
+            ufs=ufs,
+            modalidades=modalidades,
+            collect_fn=collect_fn,
+        )
         conn.execute(
             """
             UPDATE ingest_runs SET
@@ -164,39 +241,47 @@ def executar_coleta(
             WHERE id = ?
             """,
             (
-                len(raw_items),
-                novos + atualizados,
-                novos,
-                atualizados,
-                erros,
-                "ok",
+                resultado["total_bruto"],
+                resultado["total_novos"] + resultado["total_atualizados"],
+                resultado["total_novos"],
+                resultado["total_atualizados"],
+                resultado["erros"] + len(resultado["falhas_uf"]),
+                resultado["mensagem"][:500],
                 run_id,
             ),
         )
         conn.commit()
+        if resultado["status"] == "erro":
+            raise RuntimeError(resultado["mensagem"])
         out = {
             "id": run_id,
-            "status": "ok",
-            "total_bruto": len(raw_items),
-            "total_novos": novos,
-            "total_atualizados": atualizados,
-            "erros": erros,
+            "status": resultado["status"],
+            "total_bruto": resultado["total_bruto"],
+            "total_novos": resultado["total_novos"],
+            "total_atualizados": resultado["total_atualizados"],
+            "erros": resultado["erros"],
+            "falhas_uf": resultado["falhas_uf"],
             "ufs": ufs,
             "days": d,
             "data_inicial": data_inicial.isoformat(),
             "data_final": data_final.isoformat(),
         }
     except Exception as e:
-        conn.execute(
-            """
-            UPDATE ingest_runs SET
-              finalizado_em = datetime('now'),
-              mensagem = ?
-            WHERE id = ?
-            """,
-            (f"erro: {e}"[:500], run_id),
-        )
-        conn.commit()
+        # Marca o run se ainda estiver em andamento (ex.: collect_fn levantou).
+        row = conn.execute(
+            "SELECT finalizado_em FROM ingest_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        if row and row["finalizado_em"] is None:
+            conn.execute(
+                """
+                UPDATE ingest_runs SET
+                  finalizado_em = datetime('now'),
+                  mensagem = ?
+                WHERE id = ?
+                """,
+                (f"erro: {e}"[:500], run_id),
+            )
+            conn.commit()
         if own:
             conn.close()
         raise
@@ -280,25 +365,14 @@ def _executar_run_existente(
     cfg = load_yaml("ingest.yaml")
     d, ufs, modalidades = _normalizar_params(days, uf, cfg)
     try:
-        if collect_fn is not None:
-            raw_items = collect_fn(days=d, ufs=ufs, modalidades=modalidades)
-        else:
-            client = PncpClient(cfg)
-            raw_items = client.collect_window(days=d, ufs=ufs, modalidades=modalidades)
-
-        novos = 0
-        atualizados = 0
-        erros = 0
-        for raw in raw_items:
-            try:
-                is_new, _ = upsert_oportunidade(conn, raw)
-                if is_new:
-                    novos += 1
-                else:
-                    atualizados += 1
-            except Exception:
-                erros += 1
-
+        resultado = _coletar_e_persistir(
+            conn,
+            cfg=cfg,
+            days=d,
+            ufs=ufs,
+            modalidades=modalidades,
+            collect_fn=collect_fn,
+        )
         conn.execute(
             """
             UPDATE ingest_runs SET
@@ -312,12 +386,12 @@ def _executar_run_existente(
             WHERE id = ?
             """,
             (
-                len(raw_items),
-                novos + atualizados,
-                novos,
-                atualizados,
-                erros,
-                "ok",
+                resultado["total_bruto"],
+                resultado["total_novos"] + resultado["total_atualizados"],
+                resultado["total_novos"],
+                resultado["total_atualizados"],
+                resultado["erros"] + len(resultado["falhas_uf"]),
+                resultado["mensagem"][:500],
                 run_id,
             ),
         )

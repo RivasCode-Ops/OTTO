@@ -1,4 +1,4 @@
-import { fmtDate } from '../api';
+import { fmtDate, type EscopoUf } from '../api';
 import type { Cobertura } from '../types';
 import { diasDesdeColeta } from '../utils';
 
@@ -6,9 +6,21 @@ type Props = {
   cobertura: Cobertura | null;
   ordenacaoRotulo: string;
   modo: 'geral' | 'ti';
+  escopoUf?: EscopoUf;
+  /** Contagem na lista atual (UF), sem testes se ocultos — alinha ao KPI. */
+  totalEscopoVisivel?: number;
+  /** Quantos registros de teste estão ocultos no recorte UF. */
+  nTestesOcultos?: number;
 };
 
-export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
+export function CoverageBanner({
+  cobertura,
+  ordenacaoRotulo,
+  modo,
+  escopoUf = 'config',
+  totalEscopoVisivel,
+  nTestesOcultos = 0,
+}: Props) {
   if (!cobertura) return null;
   const cfg = cobertura.config_coleta;
   const ufs = (cfg.ufs || []).join(', ') || 'não configurada';
@@ -18,6 +30,33 @@ export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
   const nichos = (cobertura.banco.por_nicho || [])
     .map((n) => `${n.nicho} (${n.quantidade})`)
     .join(', ');
+  const escopo = cobertura.escopo_uf;
+  const fora = (escopo?.ufs_fora_config || [])
+    .map((x) => `${x.uf} (${x.quantidade})`)
+    .join(', ');
+  // Fallback: se a API antiga não enviar escopo_uf, usa UFs de config_coleta.
+  const ufsEscopoLista = (
+    escopo?.ufs_config?.length ? escopo.ufs_config : cfg.ufs || []
+  )
+    .map((u) => String(u).trim().toUpperCase())
+    .filter(Boolean);
+  const totalNoEscopoBruto =
+    typeof escopo?.total_no_escopo === 'number'
+      ? escopo.total_no_escopo
+      : undefined;
+  // Mesma base do KPI quando testes ocultos: totalVisivel (= bruto − testes).
+  const totalExibido =
+    typeof totalEscopoVisivel === 'number' ? totalEscopoVisivel : totalNoEscopoBruto;
+  const notaTestes =
+    nTestesOcultos > 0
+      ? ` (sem ${nTestesOcultos} teste${nTestesOcultos === 1 ? '' : 's'}; ${totalNoEscopoBruto ?? '—'} no SQLite)`
+      : '';
+  const rotuloEscopoLista =
+    escopoUf === 'todas'
+      ? `todas as UFs do banco (${cobertura.banco.total_oportunidades})`
+      : escopoUf !== 'config'
+        ? `UF ${String(escopoUf).toUpperCase()} — ${totalExibido ?? '—'} na lista${notaTestes}`
+        : `UF(s) da coleta${ufsEscopoLista.length ? ` (${ufsEscopoLista.join(', ')})` : ''} — ${totalExibido ?? '—'} no escopo${notaTestes}`;
 
   const dataUlt = ult?.finalizado_em || ult?.iniciado_em || null;
   const idade = diasDesdeColeta(dataUlt);
@@ -40,6 +79,10 @@ export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
           <li>
             <strong>Coleta configurada:</strong> UF(s) {ufs} · modalidade(s) {mods} · janela padrão{' '}
             {cfg.janela_dias_padrao} dia(s)
+          </li>
+          <li>
+            <strong>Escopo da lista:</strong> {rotuloEscopoLista}
+            {fora && escopoUf === 'config' ? ` · fora do escopo (histórico): ${fora}` : ''}
           </li>
           <li>
             <strong>No banco local:</strong> {cobertura.banco.total_oportunidades} oportunidade(s) · UF(s){' '}

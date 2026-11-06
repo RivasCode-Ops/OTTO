@@ -126,6 +126,50 @@ def test_iniciar_async_e_conclui(tmp_path: Path, monkeypatch):
     conn.close()
 
 
+def test_coleta_nacional_persiste_mesmo_com_uf_falha(tmp_path: Path, monkeypatch):
+    """Uma UF com erro de rede não descarta as UFs já gravadas."""
+    db = tmp_path / "nacional.db"
+    monkeypatch.setattr("otto_core.config.DB_PATH", db)
+    monkeypatch.setattr("otto_core.ingest_store.get_connection", lambda: _conn(db))
+    monkeypatch.setattr(
+        "otto_core.ingest_store.load_yaml",
+        lambda _name: {"ufs": ["PI", "AL", "CE"], "modalidades": [6], "janela_dias_padrao": 7},
+    )
+
+    class FakeClient:
+        def __init__(self, _cfg):
+            pass
+
+        def collect_window(self, days=None, ufs=None, modalidades=None):
+            uf = (ufs or ["PI"])[0]
+            if uf == "AL":
+                raise RuntimeError("PNCP 429 simulado")
+            return [
+                {
+                    **_raw(f"INGEST-{uf}-1"),
+                    "unidadeOrgao": {"ufSigla": uf},
+                }
+            ]
+
+    monkeypatch.setattr("otto_core.ingest_store.PncpClient", FakeClient)
+
+    out = executar_coleta(days=2)
+    assert out["status"] == "ok_parcial"
+    assert out["total_novos"] == 2
+    assert any(f.startswith("AL:") for f in out["falhas_uf"])
+
+    conn = _conn(db)
+    ufs = {
+        r["uf"]
+        for r in conn.execute("SELECT DISTINCT uf FROM oportunidades")
+    }
+    assert ufs == {"PI", "CE"}
+    assert conn.execute(
+        "SELECT mensagem FROM ingest_runs ORDER BY id DESC LIMIT 1"
+    ).fetchone()["mensagem"].startswith("ok_parcial")
+    conn.close()
+
+
 def _conn(db: Path) -> sqlite3.Connection:
     c = sqlite3.connect(db)
     c.row_factory = sqlite3.Row

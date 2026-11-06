@@ -50,7 +50,7 @@ INICIAR-OTTO.bat
 | Painel (app) | http://127.0.0.1:5194 |
 | API | http://127.0.0.1:8791 |
 
-**Coletar editais (PI, pregão eletrônico):** `otto ingest --days 7` ou **Configurações → Coleta PNCP** no app.
+**Coletar editais (27 UFs, pregão eletrônico):** `otto ingest --days 7` ou **Configurações → Coleta PNCP** no app.
 
 **Critério de uso diário (V1 fechada):** abrir o painel e **não precisar** consultar o PNCP manualmente para o pipeline do nicho principal.
 

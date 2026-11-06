@@ -415,9 +415,139 @@ def _diff_events(old: sqlite3.Row, opp: Oportunidade) -> list[OportunidadeEvento
     return events
 
 
+def _contagem_por_nicho(conn: sqlite3.Connection) -> dict[str, int]:
+    rows = conn.execute(
+        "SELECT COALESCE(nicho, 'outros') AS n, COUNT(*) AS c FROM oportunidades GROUP BY n"
+    ).fetchall()
+    return {str(r["n"]): int(r["c"]) for r in rows}
+
+
+def _tem_revisao_manual_nicho(conn: sqlite3.Connection, numero: str) -> bool:
+    """origem=usuario / revisado_pelo_usuario — nunca reclassificar."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM oportunidade_classificacoes
+        WHERE numero_controle_pncp = ?
+          AND (LOWER(COALESCE(origem, '')) = 'usuario' OR revisado_pelo_usuario = 1)
+        LIMIT 1
+        """,
+        (numero,),
+    ).fetchone()
+    return row is not None
+
+
+def _sync_classificacao_automatica(conn: sqlite3.Connection, numero: str, nicho: str) -> None:
+    from otto_core.orgaos_store import NICHO_PARA_SETOR
+
+    if _tem_revisao_manual_nicho(conn, numero):
+        return
+    setor, cat, sub = NICHO_PARA_SETOR.get(nicho or "outros", ("outros", "nao_classificado", ""))
+    agora = _now()
+    auto = conn.execute(
+        """
+        SELECT id FROM oportunidade_classificacoes
+        WHERE numero_controle_pncp = ? AND LOWER(COALESCE(origem, '')) = 'automatico'
+        ORDER BY id LIMIT 1
+        """,
+        (numero,),
+    ).fetchone()
+    if auto:
+        conn.execute(
+            """
+            UPDATE oportunidade_classificacoes
+            SET setor = ?, categoria = ?, subcategoria = ?, atualizado_em = ?
+            WHERE id = ?
+            """,
+            (setor, cat, sub, agora, auto["id"]),
+        )
+    else:
+        existe = conn.execute(
+            "SELECT 1 FROM oportunidade_classificacoes WHERE numero_controle_pncp = ? LIMIT 1",
+            (numero,),
+        ).fetchone()
+        if not existe:
+            conn.execute(
+                """
+                INSERT INTO oportunidade_classificacoes (
+                  numero_controle_pncp, setor, categoria, subcategoria,
+                  origem, revisado_pelo_usuario, atualizado_em
+                ) VALUES (?,?,?,?,?,?,?)
+                """,
+                (numero, setor, cat, sub, "automatico", 0, agora),
+            )
+
+
+def reclassify_nicho_all(conn: sqlite3.Connection) -> dict[str, Any]:
+    """
+    Reaplica classify_nicho + score (idempotente).
+    Preserva revisões manuais (origem=usuario / revisado_pelo_usuario)
+    e oportunidades com origem_registro manual/usuario.
+    """
+    antes = _contagem_por_nicho(conn)
+    rows = conn.execute(
+        """
+        SELECT numero_controle_pncp, objeto_compra, orgao_razao_social,
+               nicho, confianca_classificacao, origem_registro
+        FROM oportunidades
+        """
+    ).fetchall()
+    mudou = 0
+    preservados = 0
+    for r in rows:
+        numero = r["numero_controle_pncp"]
+        origem = (r["origem_registro"] or "").strip().lower()
+        if origem in ("manual", "usuario") or _tem_revisao_manual_nicho(conn, numero):
+            preservados += 1
+            continue
+        nicho, conf, _ = classify_nicho(
+            r["objeto_compra"] or "",
+            r["orgao_razao_social"] or "",
+        )
+        opp = get_oportunidade(conn, numero)
+        if not opp:
+            continue
+        opp2 = opp.model_copy(update={"nicho": nicho, "confianca_classificacao": conf})
+        hist = count_orgao_historico(conn, opp2.orgao_razao_social, opp2.nicho)
+        scored = compute_score(opp2, hist)
+        before = (r["nicho"] or "", r["confianca_classificacao"] or "")
+        after = (nicho, conf)
+        if before != after:
+            mudou += 1
+        conn.execute(
+            """
+            UPDATE oportunidades
+            SET nicho = ?, confianca_classificacao = ?,
+                score_total = ?, score_detalhe = ?, atualizado_em = ?
+            WHERE numero_controle_pncp = ?
+            """,
+            (
+                nicho,
+                conf,
+                scored.score_total,
+                json.dumps(scored.score_detalhe.model_dump(), ensure_ascii=False),
+                _now(),
+                numero,
+            ),
+        )
+        _sync_classificacao_automatica(conn, numero, nicho)
+    conn.commit()
+    depois = _contagem_por_nicho(conn)
+    return {
+        "total": len(rows),
+        "nicho_ou_confianca_alterados": mudou,
+        "preservados_revisao_manual": preservados,
+        "antes_por_nicho": antes,
+        "depois_por_nicho": depois,
+        "outros_depois": int(depois.get("outros", 0)),
+    }
+
+
 def upsert_oportunidade(conn: sqlite3.Connection, raw: dict[str, Any]) -> tuple[bool, list[OportunidadeEvento]]:
     data = normalize_pncp_item(raw)
-    nicho, conf, _ = classify_nicho(data["objeto_compra"])
+    nicho, conf, _ = classify_nicho(
+        data["objeto_compra"],
+        data.get("orgao_razao_social") or "",
+    )
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     opp = Oportunidade(
@@ -625,10 +755,48 @@ def _enrich_lista_meta(conn: sqlite3.Connection, items: list[Oportunidade]) -> l
     return out
 
 
+def ufs_da_coleta_config() -> list[str]:
+    """UFs configuradas em ingest.yaml (ex.: ['PI'])."""
+    from otto_core.config import load_yaml
+
+    cfg = load_yaml("ingest.yaml")
+    return [str(u).strip().upper() for u in (cfg.get("ufs") or []) if str(u).strip()]
+
+
+def resolver_ufs_filtro(
+    *,
+    uf: str | None = None,
+    escopo_uf: str = "config",
+) -> list[str] | None:
+    """
+    UFs para filtrar consultas do radar.
+    None = sem filtro (banco inteiro).
+    DECISÃO (2026-11-06): padrão `config` = só UFs da coleta; histórico de outras UFs permanece no SQLite.
+    """
+    escopo = (escopo_uf or "config").strip().lower()
+    if uf and str(uf).strip():
+        return [str(uf).strip().upper()]
+    if escopo in ("todas", "all", "*"):
+        return None
+    ufs = ufs_da_coleta_config()
+    return ufs or None
+
+
+def _sql_uf_in(alias: str, ufs: list[str] | None) -> tuple[str, list[Any]]:
+    if not ufs:
+        return "", []
+    col = f"{alias}.uf" if alias else "uf"
+    if len(ufs) == 1:
+        return f" AND {col} = ?", [ufs[0]]
+    ph = ",".join("?" * len(ufs))
+    return f" AND {col} IN ({ph})", list(ufs)
+
+
 def _oportunidades_where(
     *,
     nicho: str | None = None,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     excluir_arquivadas: bool = True,
 ) -> tuple[str, list[Any]]:
     """Cláusula WHERE compartilhada por list/count (alias `o`)."""
@@ -637,9 +805,10 @@ def _oportunidades_where(
     if nicho:
         q += " AND o.nicho = ?"
         params.append(nicho)
-    if uf:
-        q += " AND o.uf = ?"
-        params.append(uf)
+    lista = ufs if ufs is not None else ([uf] if uf else None)
+    frag, p = _sql_uf_in("o", lista)
+    q += frag
+    params.extend(p)
     if excluir_arquivadas:
         # Arquivadas saem da lista geral (README §5.4); ainda acessíveis na vista Fluxo.
         q += (
@@ -656,10 +825,11 @@ def count_oportunidades(
     *,
     nicho: str | None = None,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     excluir_arquivadas: bool = True,
 ) -> int:
     where, params = _oportunidades_where(
-        nicho=nicho, uf=uf, excluir_arquivadas=excluir_arquivadas
+        nicho=nicho, uf=uf, ufs=ufs, excluir_arquivadas=excluir_arquivadas
     )
     row = conn.execute(
         f"SELECT COUNT(*) AS c FROM oportunidades o{where}", params
@@ -672,6 +842,7 @@ def list_oportunidades(
     *,
     nicho: str | None = None,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     ordenacao: str = "publicacao",
     limit: int = 100,
     offset: int = 0,
@@ -680,7 +851,7 @@ def list_oportunidades(
     """Lista oportunidades. ordenacao: publicacao (mais recente) | prazo (encerramento mais próximo)."""
     ordem = ordenacao if ordenacao in ORDENACAO_LISTA else "publicacao"
     where, params = _oportunidades_where(
-        nicho=nicho, uf=uf, excluir_arquivadas=excluir_arquivadas
+        nicho=nicho, uf=uf, ufs=ufs, excluir_arquivadas=excluir_arquivadas
     )
     q = f"SELECT o.* FROM oportunidades o{where}"
     # NULLS LAST: em SQLite, `col IS NULL` coloca ausentes depois (0 antes de 1).
@@ -722,12 +893,28 @@ def get_cobertura_coleta(conn: sqlite3.Connection) -> dict[str, Any]:
         }
 
     total = int(conn.execute("SELECT COUNT(*) AS c FROM oportunidades").fetchone()["c"])
-    ufs_db = [
-        r["uf"]
+    ufs_cfg_norm = [str(u).strip().upper() for u in ufs_cfg if str(u).strip()]
+    ufs_cfg_set = set(ufs_cfg_norm)
+    por_uf = [
+        {"uf": r["uf"], "quantidade": int(r["c"])}
         for r in conn.execute(
-            "SELECT DISTINCT uf FROM oportunidades WHERE uf IS NOT NULL AND TRIM(uf) != '' ORDER BY uf"
+            "SELECT uf, COUNT(*) AS c FROM oportunidades "
+            "WHERE uf IS NOT NULL AND TRIM(uf) != '' GROUP BY uf ORDER BY c DESC"
         )
     ]
+    ufs_db = [x["uf"] for x in por_uf]
+    ufs_fora = [x for x in por_uf if x["uf"] not in ufs_cfg_set]
+    if ufs_cfg_norm:
+        wh_esc, par_esc = _oportunidades_where(
+            ufs=ufs_cfg_norm, excluir_arquivadas=False
+        )
+        total_escopo = int(
+            conn.execute(
+                f"SELECT COUNT(*) AS c FROM oportunidades o{wh_esc}", par_esc
+            ).fetchone()["c"]
+        )
+    else:
+        total_escopo = total
     por_nicho = [
         {"nicho": r["nicho"] or "outros", "quantidade": int(r["c"])}
         for r in conn.execute(
@@ -742,9 +929,9 @@ def get_cobertura_coleta(conn: sqlite3.Connection) -> dict[str, Any]:
 
     return {
         "aviso": (
-            "A lista mostra apenas o que já foi coletado e gravado neste computador. "
-            "“Todos os setores” significa todos os nichos presentes nesses dados — "
-            "não todas as oportunidades do Brasil."
+            "A lista e os KPIs filtram, por padrão, as UFs da coleta configurada. "
+            "Outras UFs podem existir no banco como histórico e não são apagadas. "
+            "“Todos os setores” = nichos nesses dados — não o Brasil inteiro."
         ),
         "fonte": "PNCP (Portal Nacional de Contratações Públicas)",
         "config_coleta": {
@@ -753,10 +940,22 @@ def get_cobertura_coleta(conn: sqlite3.Connection) -> dict[str, Any]:
             "modalidades": modalidades_legivel,
             "janela_dias_padrao": janela,
         },
+        "escopo_uf": {
+            "padrao": "config",
+            "ufs_config": ufs_cfg_norm,
+            "total_no_escopo": total_escopo,
+            "ufs_fora_config": ufs_fora,
+            "aviso": (
+                "Use escopo_uf=todas na API ou o toggle no painel para ver o banco inteiro."
+                if ufs_fora
+                else "Nenhuma UF fora da coleta no banco."
+            ),
+        },
         "ultima_execucao": ultima,
         "banco": {
             "total_oportunidades": total,
             "ufs_presentes": ufs_db,
+            "por_uf": por_uf,
             "por_nicho": por_nicho,
         },
         "ordenacao": {
@@ -786,6 +985,7 @@ def count_recent_eventos(
     conn: sqlite3.Connection,
     *,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     nicho: str | None = None,
     days: int = 7,
 ) -> int:
@@ -798,9 +998,10 @@ def count_recent_eventos(
     if nicho:
         q += " AND o.nicho = ?"
         params.append(nicho)
-    if uf:
-        q += " AND o.uf = ?"
-        params.append(uf)
+    lista = ufs if ufs is not None else ([uf] if uf else None)
+    frag, p = _sql_uf_in("o", lista)
+    q += frag
+    params.extend(p)
     return int(conn.execute(q, params).fetchone()["c"])
 
 
@@ -808,6 +1009,7 @@ def list_recent_eventos(
     conn: sqlite3.Connection,
     *,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     nicho: str | None = None,
     days: int = 7,
     limit: int = 8,
@@ -822,23 +1024,31 @@ def list_recent_eventos(
     if nicho:
         q += " AND o.nicho = ?"
         params.append(nicho)
-    if uf:
-        q += " AND o.uf = ?"
-        params.append(uf)
+    lista = ufs if ufs is not None else ([uf] if uf else None)
+    frag, p = _sql_uf_in("o", lista)
+    q += frag
+    params.extend(p)
     q += " ORDER BY e.detectado_em DESC LIMIT ?"
     params.append(limit)
     return [dict(r) for r in conn.execute(q, params).fetchall()]
 
 
-def kpis(conn: sqlite3.Connection, *, nicho: str | None = None, uf: str | None = None) -> dict:
+def kpis(
+    conn: sqlite3.Connection,
+    *,
+    nicho: str | None = None,
+    uf: str | None = None,
+    ufs: list[str] | None = None,
+) -> dict:
     where = "WHERE 1=1"
     params: list[Any] = []
     if nicho:
         where += " AND nicho = ?"
         params.append(nicho)
-    if uf:
-        where += " AND uf = ?"
-        params.append(uf)
+    lista = ufs if ufs is not None else ([uf] if uf else None)
+    frag, p = _sql_uf_in("", lista)
+    where += frag
+    params.extend(p)
 
     cur = conn.execute(f"SELECT COUNT(*) as c, COALESCE(SUM(valor_total_estimado),0) as v FROM oportunidades {where}", params)
     row = cur.fetchone()
@@ -878,6 +1088,7 @@ def get_alertas(
     conn: sqlite3.Connection,
     *,
     uf: str | None = None,
+    ufs: list[str] | None = None,
     nicho: str | None = "ti_software",
     desde: str | None = None,
     confianca: str = "alta",
@@ -892,9 +1103,10 @@ def get_alertas(
     if nicho:
         base += " AND nicho = ?"
         params.append(nicho)
-    if uf:
-        base += " AND uf = ?"
-        params.append(uf)
+    lista = ufs if ufs is not None else ([uf] if uf else None)
+    frag, p = _sql_uf_in("", lista)
+    base += frag
+    params.extend(p)
 
     novas_q = f"""
         SELECT * FROM oportunidades {base}
@@ -912,8 +1124,8 @@ def get_alertas(
     )
     total_novas = int(cur_n.fetchone()["c"])
 
-    mudancas = count_recent_eventos(conn, uf=uf, nicho=nicho, days=7)
-    mudancas_items = list_recent_eventos(conn, uf=uf, nicho=nicho, days=7, limit=limit)
+    mudancas = count_recent_eventos(conn, uf=uf, ufs=ufs, nicho=nicho, days=7)
+    mudancas_items = list_recent_eventos(conn, uf=uf, ufs=ufs, nicho=nicho, days=7, limit=limit)
 
     urgente_q = f"""
         SELECT COUNT(*) AS c FROM oportunidades {base}

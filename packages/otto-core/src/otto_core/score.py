@@ -45,7 +45,12 @@ def _pontos_nicho(nicho: str, confianca: str) -> tuple[float, str]:
         if confianca == "alta":
             return float(cfg.get("ti_alta", 100)), "TI — confiança alta"
         return float(cfg.get("ti_baixa", 60)), "TI — confiança baixa"
-    return float(cfg.get("outros", 10)), "Fora do nicho TI"
+    if nicho and nicho != "outros":
+        pts = float(cfg.get("setor_conhecido", 40))
+        if confianca == "baixa":
+            pts = float(cfg.get("setor_baixa", 25))
+        return pts, f"Setor {nicho}"
+    return float(cfg.get("outros", 10)), "Fora dos setores monitorados"
 
 
 def _pontos_recorrencia(orgao: str, count: int) -> tuple[float, str]:

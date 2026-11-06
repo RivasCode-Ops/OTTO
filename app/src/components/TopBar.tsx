@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import type { ModoLista, OrdenacaoLista } from '../api';
+import type { EscopoUf, ModoLista, OrdenacaoLista } from '../api';
+import { UFS_BRASIL } from '../ufsBrasil';
 import type { FiltroPrazo } from '../utils';
+
+export type NichoFiltro = 'todos' | string;
 
 type Props = {
   busca: string;
@@ -11,6 +14,15 @@ type Props = {
   onModo: (v: ModoLista) => void;
   ordenacao: OrdenacaoLista;
   onOrdenacao: (v: OrdenacaoLista) => void;
+  mostrarTestes: boolean;
+  onMostrarTestes: (v: boolean) => void;
+  escopoUf: EscopoUf;
+  onEscopoUf: (v: EscopoUf) => void;
+  ufsConfig: string[];
+  ufsPresentes: string[];
+  nicho: NichoFiltro;
+  onNicho: (v: NichoFiltro) => void;
+  nichoOpcoes: { id: string; label: string; count: number }[];
   theme: 'dark' | 'light';
   onTheme: () => void;
   onReload: () => void;
@@ -22,6 +34,11 @@ function parsePrazo(v: string): FiltroPrazo {
   return Number(v);
 }
 
+function rotuloColeta(ufsConfig: string[]): string {
+  const ufs = ufsConfig.length ? ufsConfig.join(', ') : 'coleta';
+  return `${ufs} (coleta)`;
+}
+
 export function TopBar({
   busca,
   onBusca,
@@ -31,6 +48,15 @@ export function TopBar({
   onModo,
   ordenacao,
   onOrdenacao,
+  mostrarTestes,
+  onMostrarTestes,
+  escopoUf,
+  onEscopoUf,
+  ufsConfig,
+  ufsPresentes,
+  nicho,
+  onNicho,
+  nichoOpcoes,
   theme,
   onTheme,
   onReload,
@@ -38,6 +64,10 @@ export function TopBar({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const prazoValue = dias === 'abertas' ? 'abertas' : String(dias);
+  // DECISÃO (2026-11-06): seletor sempre lista as 27 UFs — o app é multi-UF;
+  // ausência no SQLite = lista vazia, não omitir a federação.
+  const presentes = new Set(ufsPresentes.map((u) => u.toUpperCase()));
+  const ufsSelect = [...UFS_BRASIL];
 
   return (
     <header className="topbar">
@@ -73,11 +103,56 @@ export function TopBar({
           <span className="sr-only">Modo de visualização</span>
           <select
             value={modo}
-            onChange={(e) => onModo(e.target.value as ModoLista)}
+            onChange={(e) => {
+              const m = e.target.value as ModoLista;
+              onModo(m);
+              if (m === 'ti') onNicho('ti_software');
+              if (m === 'geral' && nicho === 'ti_software') onNicho('todos');
+            }}
             aria-label="Modo de visualização"
           >
             <option value="geral">Todos os setores (dados coletados)</option>
             <option value="ti">Radar TI</option>
+          </select>
+        </label>
+
+        <label className="topbar__period">
+          <span className="sr-only">UF</span>
+          <select
+            value={escopoUf}
+            onChange={(e) => onEscopoUf(e.target.value as EscopoUf)}
+            aria-label="Filtro de UF"
+          >
+            <option value="config">{rotuloColeta(ufsConfig)}</option>
+            {ufsSelect.map((uf) => (
+              <option key={uf} value={uf}>
+                {presentes.has(uf) ? uf : `${uf} (sem dados)`}
+              </option>
+            ))}
+            <option value="todas">Todas (no banco)</option>
+          </select>
+        </label>
+
+        <label className="topbar__period">
+          <span className="sr-only">Nicho</span>
+          <select
+            value={modo === 'ti' ? 'ti_software' : nicho}
+            onChange={(e) => {
+              const v = e.target.value as NichoFiltro;
+              onNicho(v);
+              if (v !== 'todos' && v !== 'ti_software' && modo === 'ti') onModo('geral');
+              if (v === 'ti_software') onModo('ti');
+              if (v === 'todos') onModo('geral');
+            }}
+            aria-label="Filtro de nicho"
+            disabled={modo === 'ti'}
+          >
+            <option value="todos">Todos</option>
+            {nichoOpcoes.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.label} ({n.count})
+              </option>
+            ))}
           </select>
         </label>
 
@@ -106,6 +181,15 @@ export function TopBar({
             <option value={30}>Prazo até 30 dias</option>
             <option value={3650}>Qualquer prazo</option>
           </select>
+        </label>
+
+        <label className="topbar__toggle">
+          <input
+            type="checkbox"
+            checked={mostrarTestes}
+            onChange={(e) => onMostrarTestes(e.target.checked)}
+          />
+          Mostrar registros de teste
         </label>
 
         <button type="button" className="btn btn--ghost" onClick={onTheme} title="Alternar tema">

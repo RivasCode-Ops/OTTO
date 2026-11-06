@@ -46,10 +46,10 @@ def test_classify_ti_alta_pge_real():
     assert conf == "alta"
 
 
-def test_classify_outros_escritorio():
+def test_classify_escritorio_setor():
     nicho, conf, _ = classify_nicho("Aquisição de material de escritório")
-    assert nicho == "outros"
-    assert conf == "nenhuma"
+    assert nicho == "material_escritorio_papelaria"
+    assert conf in ("alta", "baixa")
 
 
 def test_block_portal_compras_mobiliario():
@@ -59,16 +59,16 @@ def test_block_portal_compras_mobiliario():
     assert any("portal" in m.lower() or "mobili" in m.lower() for m in matches)
 
 
-def test_block_medicamentos():
+def test_medicamentos_setor_saude():
     nicho, conf, _ = classify_nicho(MEDICAMENTOS_GUADALUPE)
-    assert nicho == "outros"
-    assert conf == "nenhuma"
+    assert nicho == "saude_medicamentos"
+    assert conf in ("alta", "baixa")
 
 
-def test_block_cozinheiro():
+def test_cozinheiro_setor_alimentos():
     nicho, conf, _ = classify_nicho(COZINHEIRO_IFPI)
-    assert nicho == "outros"
-    assert conf == "nenhuma"
+    assert nicho == "alimentos_merenda"
+    assert conf in ("alta", "baixa")
 
 
 def test_weak_only_sistema_outros():
@@ -104,6 +104,57 @@ def test_two_weak_baixa():
     nicho, conf, _ = classify_nicho("Serviço digital com sistema eletrônico")
     assert nicho == "ti_software"
     assert conf == "baixa"
+
+
+# --- v2.2 · falsos positivos (cesta / servidor humano / SUAS) ---
+
+CESTAS_SUAS = (
+    "Contratação de empresa especializada para o fornecimento e entrega de cestas básicas, "
+    "diretamente no domicílio dos beneficiários, destinadas à população atendida pela "
+    "Secretaria Municipal de Desenvolvimento Social e Cidadania, no âmbito da concessão de "
+    "Benefícios Eventuais, conforme previsto na Política Nacional de Assistência Social – PNAS, "
+    "na Lei Orgânica da Assistência Social – LOAS (Lei nº 8.742/1993) e nas normativas do "
+    "Sistema Único de Assistência Social – SUAS."
+)
+
+CESTAS_SERVIDORES = (
+    "Contratação de empresa especializada para fornecimento de cestas básicas "
+    "para os servidores municipais da Prefeitura Municipal de Taboão da Serra"
+)
+
+ILUMINACAO_PUBLICA = (
+    "AQUISIÇÃO DE MATERIAIS ELÉTRICOS DESTINADOS À MANUTENÇÃO DA REDE DE "
+    "ILUMINAÇÃO PÚBLICA DO MUNICÍPIO"
+)
+
+
+def test_cestas_basicas_setor_alimentos():
+    nicho, conf, matches = classify_nicho(CESTAS_SUAS)
+    assert nicho == "alimentos_merenda"
+    assert conf in ("alta", "baixa")
+    assert matches
+
+
+def test_cestas_servidores_municipais_nao_ti():
+    """'servidores municipais' não pode virar TI alta via termo servidor."""
+    nicho, conf, _ = classify_nicho(CESTAS_SERVIDORES)
+    assert nicho == "alimentos_merenda"
+    assert conf in ("alta", "baixa")
+
+
+def test_block_iluminacao_publica():
+    nicho, conf, _ = classify_nicho(ILUMINACAO_PUBLICA)
+    assert nicho == "outros"
+    assert conf == "nenhuma"
+
+
+def test_servidor_hardware_ainda_alta():
+    nicho, conf, matches = classify_nicho(
+        "Aquisição de servidor rack e storage para datacenter municipal"
+    )
+    assert nicho == "ti_software"
+    assert conf == "alta"
+    assert any("servidor" in m or "datacenter" in m for m in matches)
 
 
 def test_normalize_minimal():

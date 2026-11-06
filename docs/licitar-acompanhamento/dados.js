@@ -4,35 +4,38 @@ window.LICITAR_ACOMPANHAMENTO = {
   "meta": {
     "titulo": "Acompanhar a construção do LICITAR",
     "subtitulo": "Painel de desenvolvimento — não é o aplicativo de oportunidades",
-    "atualizado_em": "2026-11-06T01:25:00-03:00",
+    "atualizado_em": "2026-11-06T14:35:00-03:00",
     "aviso_atualizacao": "Este painel NÃO atualiza sozinho. Ele só muda quando o assistente (ou você) registra uma nova atualização. Se a conversa estiver parada, o trabalho também está parado.",
     "sessao_agente": "encerrada",
-    "como_abrir": "Abra painel.html nesta pasta (duplo clique). App: INICIAR-OTTO.bat → http://127.0.0.1:5194. DOCX: docs/DOCX.md. OCR: docs/OCR.md.",
-    "onde_esta_o_projeto": "DOCX autorizado (python-docx; pagina opcional). OCR local ja entregue. Download automatico ainda nao.",
+    "como_abrir": "Abra painel.html nesta pasta (duplo clique). App: INICIAR-OTTO.bat → http://127.0.0.1:5194. Docs: INSTALACAO · OCR · DOCX · DOWNLOAD-ANEXOS · NICHOS.",
+    "onde_esta_o_projeto": "Branch wip no GitHub (RivasCode-Ops/OTTO). PR #1 aberto. Tesseract 5.5.3+por no PC. Fila autorizada desta rodada entregue.",
     "proxima_entrega_proposta": {
-      "nome": "Download automatico (autorizacao) · §12.4 se houver fonte",
-      "id_interno": "download-ou-concorrencia",
-      "status": "DOCX+OCR entregues",
+      "nome": "§12.4 Concorrencia real — so com fonte de participantes/vencedores",
+      "id_interno": "concorrencia-fonte",
+      "status": "bloqueada ate fonte",
       "nao_iniciar_sem_autorizacao": true
     },
-    "como_abrir_app": "INICIAR-OTTO.bat → oportunidade → Adicionar arquivo (.docx)"
+    "como_abrir_app": "INICIAR-OTTO.bat → http://127.0.0.1:5194"
   },
   "resumo_topo": {
     "ja_foi_feito": [
-      "DOCX: upload + extracao paragrafos/tabelas; pagina opcional; docs/DOCX.md; .doc legado rejeitado.",
-      "OCR local; doc instalacao; Vite 127.0.0.1; orgaos; ingest UI; aprendizado→prompt."
+      "Multi-nicho + filtros UF/nicho; KPI escopo PI; labels amigaveis; coleta #12 (1 novo TI).",
+      "§12.2 priorizacao orgaos; §14 Saude/Viagens; restore operacional; IMPORT-JSON na UI.",
+      "DOCX, OCR (codigo), download anexos PNCP, IA local, painel Configuracoes/ingest.",
+      "Tesseract OCR 5.5.3 instalado (eng+por). Push main+wip; PR https://github.com/RivasCode-Ops/OTTO/pull/1."
     ],
     "esta_sendo_feito": [],
-    "mensagem_sem_execucao": "Fatia DOCX encerrada.",
+    "mensagem_sem_execucao": "Rodada encerrada. Merge do PR #1 e §12.4 so com fonte — a pedido.",
     "falta_fazer": [
-      "Instalar Tesseract (dono) se PDF digitalizado for prioridade.",
-      "§12.4 concorrencia — bloqueada ate fonte.",
-      "AGUARDANDO AUTORIZACAO: download automatico, priorizacao orgaos, saude/viagens, restore operacional, IMPORT-JSON na UI."
+      "§12.4 concorrencia — bloqueada ate fonte de participantes/vencedores.",
+      "ADIADOS DE PROPOSITO: validacao humana da IA local; teste rede fisicamente off.",
+      "Ajuste fino de nichos (ex. telefone/ANATEL → obras) se aparecer em uso.",
+      "Merge do PR #1 quando quiser."
     ],
     "precisa_de_mim": [
       {
-        "pergunta_curta": "Download automatico de anexos do edital?",
-        "impede": "So captura automatica de arquivos da fonte."
+        "pergunta_curta": "Fonte de participantes/vencedores para concorrencia real (§12.4)?",
+        "impede": "So a analise real de concorrencia; o restante do app segue."
       }
     ]
   },
@@ -48,8 +51,8 @@ window.LICITAR_ACOMPANHAMENTO = {
     ],
     "limitacoes_visiveis": [
       "IA local lenta neste equipamento (i3) — aguarde o job",
-      "OCR nao implementado — PDF so-imagem nao e analisado",
-      "Teste com rede fisicamente desligada ainda pendente"
+      "PDF so-imagem: depende de Tesseract no PC (opcional)",
+      "Validacao humana da IA local e teste rede fisicamente off: adiados de proposito"
     ],
     "oportunidades_teste": [
       {
@@ -80,15 +83,12 @@ window.LICITAR_ACOMPANHAMENTO = {
       "Campo origem usuario nunca sobrescrito pela IA — so edicao manual",
       "Citacoes as vezes curtas — revisao humana obrigatoria"
     ],
-    "testes_pendentes": [
-      "Rede fisicamente desligada (endpoint local != esse teste)"
+    "testes_pendentes": [],
+    "adiados_proposito": [
+      "Validacao humana da IA local (revisao de qualidade em uso real pelo dono)",
+      "Teste com rede fisicamente desligada (endpoint local != esse teste)"
     ],
-    "aguardando_autorizacao": [
-      "DOCX",
-      "Download automatico de editais",
-      "Troca/ampliacao de modelo",
-      "Priorizacao de orgaos / saude-viagens / restore operacional"
-    ],
+    "aguardando_autorizacao": [],
     "integracao": {
       "status": "ok",
       "detalhe": "Regressao + fluxo completo + falhas/cobertura. Sem nuvem."
@@ -812,7 +812,7 @@ window.LICITAR_ACOMPANHAMENTO = {
       "titulo": "Entrada de dados / cadastro manual",
       "status": "implementado_validado",
       "evidencia": "Cadastro unitario manual (POST /api/oportunidades/manual + CadastroManualPanel); origem_registro=manual vs pncp. Import JSON removido da UI nesta correcao.",
-      "falta": "— (cadastro unitario). Import JSON: ver item IMPORT-JSON (fora do escopo autorizado).",
+      "falta": "—",
       "bloqueio": "Nenhum para cadastro unitario"
     },
     {
@@ -914,10 +914,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "§12.2",
       "titulo": "Priorização de órgãos",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Frequencia local em indicadores; priorizacao explicavel Fase 3 README.",
-      "falta": "Autorizacao para implementar priorizacao de orgaos (nao e fora do produto).",
-      "bloqueio": "Aguardando autorizacao da etapa"
+      "status": "implementado_validado",
+      "evidencia": "calcular_prioridade_orgao + list_orgaos ordena por score; motivos_prioridade na lista/detalhe; sinais: frequencia, categorias, valor/periodo, prazos abertos, interesse/salva, fluxo/resultado do usuario, anotacao. Sem reputacao. pytest test_orgaos_visoes; UI Explorar Órgãos.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§12.3",
@@ -946,10 +946,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "§14",
       "titulo": "Especializações Saúde/Viagens",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Nucleo multi-setor generico; README Fase 4 / especializacoes.",
-      "falta": "Seguir fase prevista no README (nao antecipar).",
-      "bloqueio": "Fase prevista no README"
+      "status": "implementado_validado",
+      "evidencia": "otto_core.especializacao (subtipos/condicoes so com sinal no objeto); GET /especializacao; EspecializacaoPanel no detalhe; docs/NICHOS.md; pytest test_especializacao. Sem LX Saude / app viagens.",
+      "falta": "— (leitura de anexos PDF/DOCX para requisitos setoriais continua fora deste lote).",
+      "bloqueio": "Nenhum para o escopo autorizado"
     },
     {
       "id": "§15",
@@ -962,10 +962,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "§15-restore-op",
       "titulo": "Restauração operacional do banco",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Restore isolado ativo; operacional exige autorizacao; nao bloqueia desenvolvimento.",
-      "falta": "Autorizacao explicita para substituir otto.db.",
-      "bloqueio": "Procedimento restrito (nao bloqueia outras funcionalidades)"
+      "status": "implementado_validado",
+      "evidencia": "restaurar_operacional + POST /api/backup/restaurar-operacional; confirmacao SUBSTITUIR-BANCO-OPERACIONAL; backup de seguranca automatico; UI Configuracoes; pytest test_backup_restore_op.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§16",
@@ -1010,10 +1010,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "DOWNLOAD",
       "titulo": "Download automático de anexos",
-      "status": "dependente_decisao",
-      "evidencia": "Link da fonte abre no navegador; sem download automático.",
-      "falta": "Decisão + implementação.",
-      "bloqueio": "Decisão download (separada)"
+      "status": "implementado_validado",
+      "evidencia": "otto_core.download_anexos_store; GET/POST anexos-remotos; whitelist pncp.gov.br; PDF/DOCX/TXT ≤25MB; origem download_pncp; UI Buscar/Baixar; docs/DOWNLOAD-ANEXOS.md; pytest test_download_anexos.",
+      "falta": "— (ZIP e outros formatos: listados, extração manual)",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§4/§17-itens",
@@ -1026,14 +1026,42 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "IMPORT-JSON",
       "titulo": "Importacao JSON em lote (manual)",
-      "status": "implementada_fora_escopo_aguardando_avaliacao",
-      "evidencia": "Codigo/API POST /api/oportunidades/manual/import permanece. UI removida. Registro MANUAL-595A3D764039 preservado. Auditoria import_manual_json.",
-      "falta": "Avaliacao/autorizacao para expor de novo na interface (ou decidir o destino da API).",
-      "bloqueio": "Fora do escopo do bloco autorizado; nao e requisito aprovado"
+      "status": "implementado_validado",
+      "evidencia": "POST /api/oportunidades/manual/import + CadastroManualPanel (textarea/arquivo); origem manual; auditoria import_manual_json; pytest importar_manuais_json.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     }
   ],
   "evidencias": [],
   "historico_sessoes": [
+    {
+      "quando": "2026-11-06T14:35:00-03:00",
+      "o_que_mudou": "Tesseract 5.5.3+por; remote origin; push master→main + wip; PR #1; METODO (11); painel fechado.",
+      "o_que_foi_concluido": "Tudo da lista 'faça tudo' desta sessao: painel, Tesseract, push/PR, METODO.",
+      "comprovacao": "https://github.com/RivasCode-Ops/OTTO/pull/1 ; tesseract 5.5.3 por; commit 2826775+.",
+      "estado": "encerrada"
+    },
+    {
+      "quando": "2026-11-06T14:30:00-03:00",
+      "o_que_mudou": "Tesseract 5.5.3+por instalado; remote RivasCode-Ops/OTTO (vazio) ligado para push/PR; painel e gitignore tmp/Img.",
+      "o_que_foi_concluido": "OCR de sistema pronto. Fila de codigo da rodada anterior ja commitada (c2b5929..dd920b7).",
+      "comprovacao": "tesseract --version 5.5.3; --list-langs eng/osd/por; installer GitHub releases.",
+      "estado": "encerrada"
+    },
+    {
+      "quando": "2026-11-06T14:16:00-03:00",
+      "o_que_mudou": "Fila autorizada: §12.2 orgaos, §14 Saude/Viagens, restore operacional, IMPORT-JSON UI; multi-nicho/UF; coleta #12 (+1 TI). Painel topo sincronizado.",
+      "o_que_foi_concluido": "Sem itens aguardando autorizacao nesta fila. Push/PR e Tesseract em andamento nesta sessao.",
+      "comprovacao": "Commits locais c2b5929..dd920b7; coleta #12; pytest/typecheck nas fatias.",
+      "estado": "encerrada"
+    },
+    {
+      "quando": "2026-11-06T01:35:00-03:00",
+      "o_que_mudou": "Download PNCP autorizado: listar/baixar anexos (whitelist pncp.gov.br); PDF/DOCX/TXT; UI Buscar/Baixar; docs/DOWNLOAD-ANEXOS.md.",
+      "o_que_foi_concluido": "Fatia download seletivo fechada. ZIP permanece manual.",
+      "comprovacao": "pytest test_download_anexos; typecheck; painel DOWNLOAD.",
+      "estado": "encerrada"
+    },
     {
       "quando": "2026-11-06T01:25:00-03:00",
       "o_que_mudou": "DOCX autorizado: upload .docx; extracao python-docx; pagina opcional na evidencia; docs/DOCX.md; .doc legado rejeitado.",

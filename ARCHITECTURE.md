@@ -55,7 +55,7 @@ Mapa de **módulos, fluxos e limites** entre camadas. Complementa [TECH_STACK.md
 ## Fluxo: ingest
 
 1. Orquestração em `otto_core.ingest_store` (CLI `otto ingest` e `POST /api/ingest` na UI).
-2. Lê `config/ingest.yaml` (UF=PI, modalidade 6, retries); UI pode override `--days` / `uf`.
+2. Lê `config/ingest.yaml` (27 UFs, modalidade 6, retries); UI pode override `--days` / `uf`.
 3. `PncpClient` pagina API PNCP na janela de dias (1–30).
 4. Cada item bruto → `normalize_pncp_item` → `classify_nicho` → `compute_score`.
 5. `upsert_oportunidade` persiste + detecta eventos (mudança situação/valor/prazo).
@@ -143,9 +143,10 @@ Operador observa: logs, painel, `otto alertas`, banner de alertas na UI.
 | Decisão | Motivo |
 |---------|--------|
 | Classificador **sem LLM** | Reprodutibilidade e auditabilidade TI v2.1 |
-| **PI + TI** como default V1 | Foco territorial e comercial |
+| **PI** como default de coleta/lista; nichos multi-setor | Foco territorial; classificador local por regras |
 | **SQLite local** | Simplicidade operacional V1 |
 | PNCP only (TCE-PI = V2+) | Escopo documentado em [docs/ESCOPO-FONTES.md](docs/ESCOPO-FONTES.md) |
+| Lista/KPIs = UFs da coleta | `escopo_uf=config` (padrão); outras UFs ficam no SQLite como histórico |
 | SaaS-Licitacao **separado** | Produtos distintos |
 
 ---

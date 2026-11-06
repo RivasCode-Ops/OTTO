@@ -11,6 +11,7 @@ import {
   fetchOportunidades,
   getLastSeen,
   markSeenNow,
+  type EscopoUf,
   type ModoLista,
   type OrdenacaoLista,
 } from './api';
@@ -39,13 +40,15 @@ import { OportunidadesTable } from './components/OportunidadesTable';
 import { PriorityCards } from './components/PriorityCards';
 import { RecentChanges } from './components/RecentChanges';
 import { Sidebar, type NavId } from './components/Sidebar';
-import { TopBar } from './components/TopBar';
+import { TopBar, type NichoFiltro } from './components/TopBar';
 import {
   computeKpisExtras,
   countPrazoAte,
   filterOportunidades,
   isRegistroTeste,
+  labelNicho,
   pickPriority,
+  rotuloFiltroPrazo,
   type FiltroPrazo,
 } from './utils';
 
@@ -185,7 +188,6 @@ export function App() {
   const [cobertura, setCobertura] = useState<Cobertura | null>(null);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [lista, setLista] = useState<Oportunidade[]>([]);
-  const [listaTotalBanco, setListaTotalBanco] = useState(0);
   const [acompItems, setAcompItems] = useState<
     { oportunidade: Oportunidade; acompanhamento: Acompanhamento }[]
   >([]);
@@ -207,7 +209,11 @@ export function App() {
   const [busca, setBusca] = useState('');
   const [dias, setDias] = useState<FiltroPrazo>('abertas');
   const [somenteAlta, setSomenteAlta] = useState(false);
+  const [mostrarTestes, setMostrarTestes] = useState(false);
+  const [escopoUf, setEscopoUf] = useState<EscopoUf>('config');
+  const [nichoFiltro, setNichoFiltro] = useState<NichoFiltro>('todos');
   const radarAbort = useRef<AbortController | null>(null);
+  const detalheOrigemFocus = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -237,18 +243,30 @@ export function App() {
     try {
       const desde = getLastSeen() ?? undefined;
       const signal = ac.signal;
+      // Lista geral: carrega por UF; nicho filtra no cliente (contagens no select).
+      // Radar TI / KPIs: nicho ti_software ou o filtro ativo.
+      const nichoKpi =
+        modo === 'ti'
+          ? 'ti_software'
+          : nichoFiltro !== 'todos'
+            ? nichoFiltro
+            : null;
       const [cov, k, listaMeta, ev, al] = await Promise.all([
         fetchCobertura(signal),
-        fetchKpis(modo, signal),
-        fetchOportunidades(modo, ordenacao, signal),
-        fetchEventosRecentes(modo, signal),
-        modo === 'ti' ? fetchAlertas(desde, signal) : Promise.resolve(null),
+        fetchKpis(modo, signal, escopoUf, nichoKpi),
+        fetchOportunidades(
+          modo === 'ti' ? 'ti' : 'geral',
+          ordenacao,
+          signal,
+          escopoUf,
+        ),
+        fetchEventosRecentes(modo, signal, escopoUf),
+        modo === 'ti' ? fetchAlertas(desde, signal, escopoUf) : Promise.resolve(null),
       ]);
       if (signal.aborted) return;
       setCobertura(cov);
       setKpis(k);
       setLista(listaMeta.items);
-      setListaTotalBanco(listaMeta.total || k.total || listaMeta.items.length);
       setOrdenacaoRotulo(listaMeta.ordenacao_rotulo);
       setRecentes(ev);
       setAlertas(al);
@@ -273,7 +291,7 @@ export function App() {
     } finally {
       if (!ac.signal.aborted) setLoading(false);
     }
-  }, [modo, ordenacao, refreshContagens]);
+  }, [modo, ordenacao, escopoUf, nichoFiltro, refreshContagens]);
 
   // Evita resposta atrasada de um filtro sobrescrever a vista atual.
   const acompGen = useRef(0);
@@ -365,36 +383,106 @@ export function App() {
     void reloadAcomp();
   }, [vista, reloadRadar, reloadAcomp, reloadFluxo]);
 
-  const listaOperacional = useMemo(
-    () => lista.filter((o) => !isRegistroTeste(o)),
-    [lista],
-  );
+  const nichoAtivo: string | null =
+    modo === 'ti' ? 'ti_software' : nichoFiltro === 'todos' ? null : nichoFiltro;
 
   const filtradas = useMemo(
     () =>
-      filterOportunidades(listaOperacional, {
+      filterOportunidades(lista, {
         q: busca,
         dias,
         somenteAlta: modo === 'ti' ? somenteAlta : false,
-        ocultarTestes: true,
+        ocultarTestes: !mostrarTestes,
+        nicho: nichoAtivo,
       }),
-    [listaOperacional, busca, dias, somenteAlta, modo],
+    [lista, busca, dias, somenteAlta, modo, mostrarTestes, nichoAtivo],
   );
 
-  const extras = useMemo(() => computeKpisExtras(listaOperacional), [listaOperacional]);
-  const vencendo7 = useMemo(() => countPrazoAte(listaOperacional, 7), [listaOperacional]);
+  // Recorte UF+nicho no banco (sem prazo) — órgãos / TI alta / prazo≤7.
+  const listaParaKpisLocais = useMemo(
+    () =>
+      filterOportunidades(lista, {
+        q: '',
+        dias: 3650,
+        somenteAlta: false,
+        ocultarTestes: !mostrarTestes,
+        nicho: nichoAtivo,
+      }),
+    [lista, mostrarTestes, nichoAtivo],
+  );
+
+  // Card Oportunidades segue o filtro de prazo (alinha à tabela sem busca).
+  const listaKpiComPrazo = useMemo(
+    () =>
+      filterOportunidades(lista, {
+        q: '',
+        dias,
+        somenteAlta: false,
+        ocultarTestes: !mostrarTestes,
+        nicho: nichoAtivo,
+      }),
+    [lista, dias, mostrarTestes, nichoAtivo],
+  );
+
+  const extras = useMemo(() => computeKpisExtras(listaParaKpisLocais), [listaParaKpisLocais]);
+  const vencendo7 = useMemo(() => countPrazoAte(listaParaKpisLocais, 7), [listaParaKpisLocais]);
   const prioridade = useMemo(
     () => pickPriority(filtradas, 5, { modo, ordenacao }),
     [filtradas, modo, ordenacao],
   );
-  // Total do banco (API), descontando manuais de teste já carregados — não o limit da página.
-  const kpiTotal = Math.max(
-    0,
-    (listaTotalBanco || kpis?.total || lista.length) - (lista.length - listaOperacional.length),
-  );
-  const semDados = !loading && !erro && listaOperacional.length === 0;
+  const kpiTotal = listaKpiComPrazo.length;
+  const kpiTotalBanco = listaParaKpisLocais.length;
+  const kpiPrazoRotulo = rotuloFiltroPrazo(dias);
+
+  // Escopo UF na lista vs banner: diferença = registros de teste ocultos.
+  const nTestesOcultosUf = useMemo(() => {
+    if (mostrarTestes) return 0;
+    return lista.filter((o) => isRegistroTeste(o)).length;
+  }, [lista, mostrarTestes]);
+  const totalEscopoVisivelUf = useMemo(() => {
+    if (mostrarTestes) return lista.length;
+    return lista.filter((o) => !isRegistroTeste(o)).length;
+  }, [lista, mostrarTestes]);
+
+  // Contagens do select Nicho: respeitam UF (lista) + prazo ativo.
+  const nichoOpcoes = useMemo(() => {
+    const base = filterOportunidades(lista, {
+      q: '',
+      dias,
+      somenteAlta: false,
+      ocultarTestes: !mostrarTestes,
+    });
+    const counts = new Map<string, number>();
+    for (const o of base) {
+      const id = o.nicho || 'outros';
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([id, count]) => ({ id, label: labelNicho(id), count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }, [lista, dias, mostrarTestes]);
+
+  const semDados = !loading && !erro && filtradas.length === 0 && lista.length === 0;
+
+  function aplicarFiltroUf(uf: string) {
+    const u = uf.trim().toUpperCase();
+    if (!u || u === '—') return;
+    setEscopoUf(u);
+    setVista('radar');
+  }
+
+  function aplicarFiltroNicho(nicho: string) {
+    const n = (nicho || '').trim();
+    if (!n) return;
+    setNichoFiltro(n);
+    setModo(n === 'ti_software' ? 'ti' : 'geral');
+    setVista('radar');
+  }
 
   async function abrirDetalhe(o: Oportunidade) {
+    const ae = document.activeElement;
+    detalheOrigemFocus.current =
+      ae instanceof HTMLElement ? ae : null;
     setSel(o);
     setDetalheLoading(true);
     setEventos([]);
@@ -461,6 +549,17 @@ export function App() {
     setSelAcomp(null);
     setEventos([]);
     setDetalheLoading(false);
+    const el = detalheOrigemFocus.current;
+    detalheOrigemFocus.current = null;
+    if (el) {
+      requestAnimationFrame(() => {
+        try {
+          el.focus();
+        } catch {
+          /* elemento pode ter sumido */
+        }
+      });
+    }
   }
 
   async function onAcompChange(a: Acompanhamento) {
@@ -484,6 +583,15 @@ export function App() {
             onModo={setModo}
             ordenacao={ordenacao}
             onOrdenacao={setOrdenacao}
+            mostrarTestes={mostrarTestes}
+            onMostrarTestes={setMostrarTestes}
+            escopoUf={escopoUf}
+            onEscopoUf={setEscopoUf}
+            ufsConfig={cobertura?.escopo_uf?.ufs_config || cobertura?.config_coleta?.ufs || ['PI']}
+            ufsPresentes={cobertura?.banco?.ufs_presentes || []}
+            nicho={nichoFiltro}
+            onNicho={setNichoFiltro}
+            nichoOpcoes={nichoOpcoes}
             theme={theme}
             onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onReload={() => void reloadRadar()}
@@ -542,7 +650,14 @@ export function App() {
 
           {!erro && vista === 'radar' && !loading && (
             <>
-              <CoverageBanner cobertura={cobertura} ordenacaoRotulo={ordenacaoRotulo} modo={modo} />
+              <CoverageBanner
+                cobertura={cobertura}
+                ordenacaoRotulo={ordenacaoRotulo}
+                modo={modo}
+                escopoUf={escopoUf}
+                totalEscopoVisivel={totalEscopoVisivelUf}
+                nTestesOcultos={nTestesOcultosUf}
+              />
 
               {modo === 'ti' && !alertasDismissed && alertas && (
                 <AlertsBanner
@@ -556,6 +671,9 @@ export function App() {
 
               <KpiStrip
                 total={kpiTotal}
+                totalBanco={kpiTotalBanco}
+                prazoRotulo={kpiPrazoRotulo}
+                nTestesOcultos={nichoAtivo ? 0 : nTestesOcultosUf}
                 altaConfianca={extras.altaConfianca}
                 scoreMedio={extras.scoreMedio}
                 orgaosAtivos={extras.orgaosAtivos}
@@ -585,7 +703,7 @@ export function App() {
 
               <OportunidadesTable
                 items={filtradas}
-                totalBase={listaOperacional.length}
+                totalBase={listaParaKpisLocais.length}
                 modo={modo}
                 somenteAlta={somenteAlta}
                 onSomenteAlta={setSomenteAlta}
@@ -599,7 +717,12 @@ export function App() {
           )}
 
           {!erro && isExplorar(vista) && (
-            <ExplorarPanel modo={vista} onSelectOportunidade={(n) => void abrirPorNumero(n)} />
+            <ExplorarPanel
+              modo={vista}
+              onSelectOportunidade={(n) => void abrirPorNumero(n)}
+              onSelectUf={aplicarFiltroUf}
+              onSelectNicho={aplicarFiltroNicho}
+            />
           )}
 
           {!erro && vista === 'configuracoes' && <ConfiguracoesPanel />}

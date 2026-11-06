@@ -330,6 +330,20 @@ code {
   font-size: 0.85rem;
 }
 
+.topbar__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.topbar__toggle input {
+  accent-color: var(--accent);
+}
+
 @media (max-width: 700px) {
   .topbar {
     align-items: stretch;
@@ -608,6 +622,13 @@ code {
 }
 
 .conf-pill--alta {
+  border-color: rgb(20 184 166 / 40%);
+  color: var(--accent);
+}
+
+.conf-pill--nicho {
+  text-transform: none;
+  letter-spacing: 0.02em;
   border-color: rgb(20 184 166 / 40%);
   color: var(--accent);
 }

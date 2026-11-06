@@ -2,7 +2,7 @@
 
 Documento canônico de **versões, ferramentas e comandos**. Leia antes de implementar (regra #5).
 
-**Atualizado:** nov/2026 · **Produto:** V1 radar PI · TI · local · IA documental local (sem nuvem)
+**Atualizado:** nov/2026 · **Produto:** radar nacional (27 UFs) · multi-nicho · local · IA documental local (sem nuvem)
 
 ---
 

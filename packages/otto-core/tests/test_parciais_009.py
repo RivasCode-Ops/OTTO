@@ -76,7 +76,7 @@ def test_prazos_import_orientacao_resultados_item_setor(tmp_path: Path):
     assert manual["setor"] == "ti_software"
     assert manual["classificacao_origem"] == "usuario"
 
-    # Import JSON permanece no core (fora do escopo de UI); teste de API/core preservado.
+    # Import JSON (API + UI Cadastro manual).
     imp = importar_manuais_json(
         conn,
         [{"objeto_compra": "Cadeiras escolares", "orgao_razao_social": "SME", "uf": "PI"}],

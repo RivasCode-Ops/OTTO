@@ -79,7 +79,7 @@ otto ingest --days 7
 
 Ou pela UI: **Configurações → Coleta PNCP → Atualizar coleta agora** (janela 2 / 7 / 14 dias). Só uma coleta por vez.
 
-UF e modalidade padrão: `config/ingest.yaml` (V1: PI, pregão eletrônico).
+UF e modalidade padrão: `config/ingest.yaml` (27 UFs + pregão eletrônico).
 
 Agendamento Windows (opcional): [AGENDADOR-WINDOWS.md](AGENDADOR-WINDOWS.md).
 

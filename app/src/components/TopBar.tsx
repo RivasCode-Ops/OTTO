@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EscopoUf, ModoLista, OrdenacaoLista } from '../api';
+import { UFS_BRASIL } from '../ufsBrasil';
 import type { FiltroPrazo } from '../utils';
 
 export type NichoFiltro = 'todos' | string;
@@ -63,9 +64,10 @@ export function TopBar({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const prazoValue = dias === 'abertas' ? 'abertas' : String(dias);
-  const ufsSelect = Array.from(
-    new Set([...ufsConfig.map((u) => u.toUpperCase()), ...ufsPresentes.map((u) => u.toUpperCase())]),
-  ).filter(Boolean).sort();
+  // DECISÃO (2026-11-06): seletor sempre lista as 27 UFs — o app é multi-UF;
+  // ausência no SQLite = lista vazia, não omitir a federação.
+  const presentes = new Set(ufsPresentes.map((u) => u.toUpperCase()));
+  const ufsSelect = [...UFS_BRASIL];
 
   return (
     <header className="topbar">
@@ -124,10 +126,10 @@ export function TopBar({
             <option value="config">{rotuloColeta(ufsConfig)}</option>
             {ufsSelect.map((uf) => (
               <option key={uf} value={uf}>
-                {uf}
+                {presentes.has(uf) ? uf : `${uf} (sem dados)`}
               </option>
             ))}
-            <option value="todas">Todas</option>
+            <option value="todas">Todas (no banco)</option>
           </select>
         </label>
 

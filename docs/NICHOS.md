@@ -59,7 +59,7 @@ API: `GET /api/oportunidades/{numero}/especializacao`.
 
 ## Painel
 
-- Filtro **UF**: coleta (padrão) · cada UF do banco · Todas  
+- Filtro **UF**: coleta (padrão) · as 27 UFs (sem dados no SQLite aparece marcado) · Todas (no banco)  
 - Filtro **Nicho**: Todos + setores com contagem (respeita UF + prazo ativos)  
 - Regiões / Categorias: clique aplica filtro e volta à Lista geral  
 

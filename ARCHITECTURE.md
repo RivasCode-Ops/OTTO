@@ -143,9 +143,10 @@ Operador observa: logs, painel, `otto alertas`, banner de alertas na UI.
 | Decisão | Motivo |
 |---------|--------|
 | Classificador **sem LLM** | Reprodutibilidade e auditabilidade TI v2.1 |
-| **PI + TI** como default V1 | Foco territorial e comercial |
+| **PI** como default de coleta/lista; nichos multi-setor | Foco territorial; classificador local por regras |
 | **SQLite local** | Simplicidade operacional V1 |
 | PNCP only (TCE-PI = V2+) | Escopo documentado em [docs/ESCOPO-FONTES.md](docs/ESCOPO-FONTES.md) |
+| Lista/KPIs = UFs da coleta | `escopo_uf=config` (padrão); outras UFs ficam no SQLite como histórico |
 | SaaS-Licitacao **separado** | Produtos distintos |
 
 ---

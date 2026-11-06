@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fmtDate, fmtMoney, patchPrazosManuais, saveAcompanhamento, saveFluxo } from '../api';
 import type { Acompanhamento, DecisaoUsuario, Evento, Oportunidade } from '../types';
 import { ClassificacaoPanel } from './ClassificacaoPanel';
@@ -54,6 +54,7 @@ export function DetailDrawer({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setAc(acompanhamento);
@@ -64,6 +65,18 @@ export function DetailDrawer({
     setMsg('');
     setErro('');
   }, [acompanhamento, o.numero_controle_pncp, o.data_esclarecimento, o.data_impugnacao]);
+
+  useEffect(() => {
+    closeBtnRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, o.numero_controle_pncp]);
 
   async function patch(partial: Parameters<typeof saveAcompanhamento>[1]) {
     setSaving(true);
@@ -91,7 +104,35 @@ export function DetailDrawer({
   return (
     <>
       <button type="button" className="drawer-backdrop" aria-label="Fechar detalhe" onClick={onClose} />
-      <aside className="drawer drawer--open" role="dialog" aria-labelledby="drawer-title">
+      <aside
+        className="drawer drawer--open"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={loading ? undefined : 'drawer-title'}
+        aria-label={loading ? 'Detalhe da oportunidade' : undefined}
+      >
+        <header className="drawer__head">
+          <div>
+            {!loading && (
+              <>
+                <span className="pill">{o.nicho || 'sem nicho'}</span>
+                <span className="pill">{o.situacao || 'situação não informada'}</span>
+                <span className="pill">
+                  {o.origem_registro === 'manual' ? 'Origem: cadastro manual' : 'Origem: PNCP (coleta)'}
+                </span>
+              </>
+            )}
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            className="drawer__close"
+            onClick={onClose}
+            aria-label="Fechar detalhe"
+          >
+            ×
+          </button>
+        </header>
         {loading ? (
           <div className="drawer__loading">
             <div className="skeleton-line skeleton-line--title" />
@@ -100,18 +141,6 @@ export function DetailDrawer({
           </div>
         ) : (
           <>
-            <header className="drawer__head">
-              <div>
-                <span className="pill">{o.nicho || 'sem nicho'}</span>
-                <span className="pill">{o.situacao || 'situação não informada'}</span>
-                <span className="pill">
-                  {o.origem_registro === 'manual' ? 'Origem: cadastro manual' : 'Origem: PNCP (coleta)'}
-                </span>
-              </div>
-              <button type="button" className="drawer__close" onClick={onClose} aria-label="Fechar">
-                ×
-              </button>
-            </header>
 
             <h2 id="drawer-title" className="drawer__title">
               Oportunidade

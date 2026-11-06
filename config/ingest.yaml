@@ -1,4 +1,4 @@
-# Coleta PNCP — MVP São Paulo
+# Coleta PNCP — V1 Piauí (outras UFs no banco = histórico; lista filtra estas por padrão)
 ufs:
   - PI
 

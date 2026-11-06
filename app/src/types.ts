@@ -80,9 +80,17 @@ export type Cobertura = {
     erros?: number;
     mensagem?: string;
   } | null;
+  escopo_uf?: {
+    padrao: string;
+    ufs_config: string[];
+    total_no_escopo: number;
+    ufs_fora_config: { uf: string; quantidade: number }[];
+    aviso: string;
+  };
   banco: {
     total_oportunidades: number;
     ufs_presentes: string[];
+    por_uf?: { uf: string; quantidade: number }[];
     por_nicho: { nicho: string; quantidade: number }[];
   };
   ordenacao: {

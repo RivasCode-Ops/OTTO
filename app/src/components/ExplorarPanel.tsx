@@ -14,9 +14,16 @@ export type ExplorarModo = 'orgaos' | 'categorias' | 'regioes' | 'indicadores' |
 type Props = {
   modo: ExplorarModo;
   onSelectOportunidade: (numero: string) => void;
+  onSelectUf?: (uf: string) => void;
+  onSelectNicho?: (nicho: string) => void;
 };
 
-export function ExplorarPanel({ modo, onSelectOportunidade }: Props) {
+export function ExplorarPanel({
+  modo,
+  onSelectOportunidade,
+  onSelectUf,
+  onSelectNicho,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
   const [orgaos, setOrgaos] = useState<Awaited<ReturnType<typeof fetchOrgaos>> | null>(null);
@@ -232,13 +239,29 @@ export function ExplorarPanel({ modo, onSelectOportunidade }: Props) {
               </tr>
             </thead>
             <tbody>
-              {cats.items.map((c, i) => (
-                <tr key={`${c.setor}-${c.categoria}`} className={i % 2 ? 'data-table__row--zebra' : ''}>
-                  <td>{c.setor}</td>
-                  <td>{c.categoria || '—'}</td>
-                  <td>{c.quantidade}</td>
-                </tr>
-              ))}
+              {cats.items.map((c, i) => {
+                const nichoId = (c as { nicho?: string }).nicho || c.setor;
+                return (
+                  <tr key={`${c.setor}-${c.categoria}`} className={i % 2 ? 'data-table__row--zebra' : ''}>
+                    <td>
+                      {onSelectNicho ? (
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => onSelectNicho(nichoId)}
+                          title="Filtrar Lista geral por este nicho"
+                        >
+                          {c.setor}
+                        </button>
+                      ) : (
+                        c.setor
+                      )}
+                    </td>
+                    <td>{c.categoria || '—'}</td>
+                    <td>{c.quantidade}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </>
@@ -264,7 +287,20 @@ export function ExplorarPanel({ modo, onSelectOportunidade }: Props) {
             <tbody>
               {regs.items.map((r, i) => (
                 <tr key={r.uf} className={i % 2 ? 'data-table__row--zebra' : ''}>
-                  <td>{r.uf}</td>
+                  <td>
+                    {onSelectUf ? (
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => onSelectUf(r.uf)}
+                        title="Filtrar Lista geral por esta UF"
+                      >
+                        {r.uf}
+                      </button>
+                    ) : (
+                      r.uf
+                    )}
+                  </td>
                   <td>{r.quantidade}</td>
                   <td>
                     {r.valor_estimado_soma != null

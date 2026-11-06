@@ -93,6 +93,7 @@ from otto_core.db import (
     list_eventos,
     count_oportunidades,
     list_oportunidades,
+    resolver_ufs_filtro,
     list_recent_eventos,
     upsert_acompanhamento,
 )
@@ -186,16 +187,23 @@ def get_cobertura() -> dict:
 @app.get("/api/kpis")
 def get_kpis(
     nicho: str | None = Query(None, description="Vazio = todos os nichos no banco"),
-    uf: str | None = Query(None, description="Vazio = todas as UFs no banco"),
+    uf: str | None = Query(None, description="UF explícita (sobrepõe escopo)"),
+    escopo_uf: str = Query(
+        "config",
+        description="config = UFs do ingest.yaml (padrão); todas = banco inteiro",
+    ),
 ) -> dict:
     conn = get_connection()
     try:
-        data = kpis(conn, nicho=_empty_to_none(nicho), uf=_empty_to_none(uf))
+        ufs = resolver_ufs_filtro(uf=_empty_to_none(uf), escopo_uf=escopo_uf)
+        data = kpis(conn, nicho=_empty_to_none(nicho), ufs=ufs)
         return {
             "total": data["total"],
             "valor_pipeline": data["valor_pipeline"],
             "vencendo_7_dias": data["vencendo_7_dias"],
             "top10": [_serialize_opp(o) for o in data["top10"]],
+            "escopo_uf": escopo_uf if not _empty_to_none(uf) else "uf",
+            "ufs_filtro": ufs,
         }
     finally:
         conn.close()
@@ -204,7 +212,11 @@ def get_kpis(
 @app.get("/api/oportunidades")
 def get_oportunidades(
     nicho: str | None = Query(None, description="Vazio = todos os setores presentes nos dados"),
-    uf: str | None = Query(None, description="Vazio = todas as UFs presentes nos dados"),
+    uf: str | None = Query(None, description="UF explícita (sobrepõe escopo)"),
+    escopo_uf: str = Query(
+        "config",
+        description="config = UFs do ingest.yaml (padrão); todas = banco inteiro",
+    ),
     ordenacao: str = Query(
         "publicacao",
         description="publicacao (mais recente) | prazo (encerramento da proposta, mais próximo)",
@@ -217,13 +229,13 @@ def get_oportunidades(
     conn = get_connection()
     try:
         n = _empty_to_none(nicho)
-        u = _empty_to_none(uf)
+        ufs = resolver_ufs_filtro(uf=_empty_to_none(uf), escopo_uf=escopo_uf)
         excluir = not incluir_arquivadas
-        total = count_oportunidades(conn, nicho=n, uf=u, excluir_arquivadas=excluir)
+        total = count_oportunidades(conn, nicho=n, ufs=ufs, excluir_arquivadas=excluir)
         items = list_oportunidades(
             conn,
             nicho=n,
-            uf=u,
+            ufs=ufs,
             ordenacao=ordem,
             limit=limit,
             offset=offset,
@@ -236,6 +248,8 @@ def get_oportunidades(
             "total": total,
             "limit": limit,
             "offset": offset,
+            "escopo_uf": escopo_uf if not _empty_to_none(uf) else "uf",
+            "ufs_filtro": ufs,
             "ordenacao": ordem,
             "ordenacao_campo": "data_publicacao" if ordem == "publicacao" else prazo_campo,
             "ordenacao_rotulo": (
@@ -434,16 +448,18 @@ def put_acompanhamento(numero: str, body: AcompanhamentoUpdate) -> dict:
 def get_alertas_api(
     nicho: str | None = Query("ti_software"),
     uf: str | None = Query(None),
+    escopo_uf: str = Query("config"),
     desde: str | None = Query(None, description="ISO datetime — default últimas 24h"),
     confianca: str = Query("alta"),
     limit: int = Query(10, le=30),
 ) -> dict:
     conn = get_connection()
     try:
+        ufs = resolver_ufs_filtro(uf=_empty_to_none(uf), escopo_uf=escopo_uf)
         data = get_alertas(
             conn,
             nicho=_empty_to_none(nicho) or "ti_software",
-            uf=_empty_to_none(uf),
+            ufs=ufs,
             desde=desde,
             confianca=confianca,
             limit=limit,
@@ -462,16 +478,17 @@ def get_alertas_api(
 def get_eventos_recentes(
     nicho: str | None = Query(None),
     uf: str | None = Query(None),
+    escopo_uf: str = Query("config"),
     days: int = Query(7, ge=1, le=90),
     limit: int = Query(8, le=50),
 ) -> dict:
     conn = get_connection()
     try:
         n = _empty_to_none(nicho)
-        u = _empty_to_none(uf)
-        total = count_recent_eventos(conn, nicho=n, uf=u, days=days)
-        items = list_recent_eventos(conn, nicho=n, uf=u, days=days, limit=limit)
-        return {"total": total, "items": items, "days": days}
+        ufs = resolver_ufs_filtro(uf=_empty_to_none(uf), escopo_uf=escopo_uf)
+        total = count_recent_eventos(conn, nicho=n, ufs=ufs, days=days)
+        items = list_recent_eventos(conn, nicho=n, ufs=ufs, days=days, limit=limit)
+        return {"total": total, "items": items, "days": days, "ufs_filtro": ufs}
     finally:
         conn.close()
 

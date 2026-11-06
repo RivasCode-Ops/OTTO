@@ -18,9 +18,16 @@ from typing import Any
 
 from otto_core.models import Oportunidade
 
-# Mapeamento do nicho legado → classificação multissetorial (não restringe a lista).
+# Mapeamento nicho (coluna oportunidades) → classificação multissetorial.
 NICHO_PARA_SETOR: dict[str, tuple[str, str, str]] = {
     "ti_software": ("ti", "software_e_servicos", ""),
+    "saude_medicamentos": ("saude_medicamentos", "medicamentos_hospitalar", ""),
+    "obras_engenharia": ("obras_engenharia", "obras_e_reforma", ""),
+    "passagens_viagens": ("passagens_viagens", "agenciamento", ""),
+    "alimentos_merenda": ("alimentos_merenda", "merenda_e_generos", ""),
+    "material_escritorio_papelaria": ("material_escritorio_papelaria", "expediente", ""),
+    "limpeza_conservacao": ("limpeza_conservacao", "limpeza", ""),
+    "veiculos_combustiveis": ("veiculos_combustiveis", "frota_e_combustivel", ""),
     "outros": ("outros", "nao_classificado", ""),
 }
 
@@ -475,27 +482,35 @@ def add_classificacao(
 
 
 def visao_categorias(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Visão por nicho (coluna oportunidades) — clique na UI aplica filtro na lista."""
+    from otto_core.niche import NICHOS_LABELS
+
     ensure_classificacoes_basicas(conn)
     rows = conn.execute(
         """
-        SELECT setor, categoria, COUNT(*) AS c
-        FROM oportunidade_classificacoes
-        GROUP BY setor, categoria
+        SELECT COALESCE(nicho, 'outros') AS setor, COUNT(*) AS c
+        FROM oportunidades
+        GROUP BY COALESCE(nicho, 'outros')
         ORDER BY c DESC
         """
     ).fetchall()
     return {
         "items": [
-            {"setor": r["setor"], "categoria": r["categoria"], "quantidade": int(r["c"])}
+            {
+                "setor": r["setor"],
+                "categoria": NICHOS_LABELS.get(str(r["setor"]), str(r["setor"])),
+                "nicho": r["setor"],
+                "quantidade": int(r["c"]),
+            }
             for r in rows
         ],
         "aviso": (
-            "Classificação multissetorial local. O nicho TI legado alimenta o setor 'ti' "
-            "automaticamente, mas a lista geral não fica restrita a TI."
+            "Categorias = nichos do classificador local (regras sobre objeto/órgão). "
+            "Clique num setor para filtrar a Lista geral."
         ),
         "limitacoes": [
-            "Setor 'outros/nao_classificado' é residual do classificador atual.",
-            "Revisão manual pelo usuário tem origem=usuario.",
+            "Setor 'outros' é residual (sem regra forte).",
+            "Revisão manual (origem=usuario) não é sobrescrita na reclassificação.",
         ],
     }
 

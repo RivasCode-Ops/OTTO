@@ -11,6 +11,7 @@ from otto_core.orgaos_store import (
     ensure_classificacoes_basicas,
     get_orgao,
     indicadores_explorar,
+    list_classificacoes_opp,
     list_orgaos,
     visao_categorias,
     visao_regiao,
@@ -80,7 +81,13 @@ def test_orgaos_categorias_concorrencia_insuficiente(tmp_path: Path):
 
     add_classificacao(conn, "ORG-0", setor="saude", categoria="materiais")
     cats = visao_categorias(conn)
-    assert any(c["setor"] == "saude" for c in cats["items"])
+    # Visão Categorias agrega oportunidades.nicho (não só tabela de classificações).
+    assert any(c.get("nicho") or c["setor"] for c in cats["items"])
+    assert any(
+        (c.get("nicho") or c["setor"]) in ("ti_software", "outros", "saude_medicamentos")
+        for c in cats["items"]
+    )
+    assert list_classificacoes_opp(conn, "ORG-0")
 
     regs = visao_regiao(conn)
     assert {r["uf"] for r in regs["items"]} >= {"PI", "SP"}

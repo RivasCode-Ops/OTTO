@@ -1,4 +1,4 @@
-import { fmtDate } from '../api';
+import { fmtDate, type EscopoUf } from '../api';
 import type { Cobertura } from '../types';
 import { diasDesdeColeta } from '../utils';
 
@@ -6,9 +6,10 @@ type Props = {
   cobertura: Cobertura | null;
   ordenacaoRotulo: string;
   modo: 'geral' | 'ti';
+  escopoUf?: EscopoUf;
 };
 
-export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
+export function CoverageBanner({ cobertura, ordenacaoRotulo, modo, escopoUf = 'config' }: Props) {
   if (!cobertura) return null;
   const cfg = cobertura.config_coleta;
   const ufs = (cfg.ufs || []).join(', ') || 'não configurada';
@@ -18,6 +19,26 @@ export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
   const nichos = (cobertura.banco.por_nicho || [])
     .map((n) => `${n.nicho} (${n.quantidade})`)
     .join(', ');
+  const escopo = cobertura.escopo_uf;
+  const fora = (escopo?.ufs_fora_config || [])
+    .map((x) => `${x.uf} (${x.quantidade})`)
+    .join(', ');
+  // Fallback: se a API antiga não enviar escopo_uf, usa UFs de config_coleta.
+  const ufsEscopoLista = (
+    escopo?.ufs_config?.length ? escopo.ufs_config : cfg.ufs || []
+  )
+    .map((u) => String(u).trim().toUpperCase())
+    .filter(Boolean);
+  const totalNoEscopo =
+    typeof escopo?.total_no_escopo === 'number'
+      ? escopo.total_no_escopo
+      : undefined;
+  const rotuloEscopoLista =
+    escopoUf === 'todas'
+      ? `todas as UFs do banco (${cobertura.banco.total_oportunidades})`
+      : escopoUf !== 'config'
+        ? `UF ${String(escopoUf).toUpperCase()} (filtro)`
+        : `UF(s) da coleta${ufsEscopoLista.length ? ` (${ufsEscopoLista.join(', ')})` : ''} — ${totalNoEscopo ?? '—'} no escopo`;
 
   const dataUlt = ult?.finalizado_em || ult?.iniciado_em || null;
   const idade = diasDesdeColeta(dataUlt);
@@ -40,6 +61,10 @@ export function CoverageBanner({ cobertura, ordenacaoRotulo, modo }: Props) {
           <li>
             <strong>Coleta configurada:</strong> UF(s) {ufs} · modalidade(s) {mods} · janela padrão{' '}
             {cfg.janela_dias_padrao} dia(s)
+          </li>
+          <li>
+            <strong>Escopo da lista:</strong> {rotuloEscopoLista}
+            {fora && escopoUf === 'config' ? ` · fora do escopo (histórico): ${fora}` : ''}
           </li>
           <li>
             <strong>No banco local:</strong> {cobertura.banco.total_oportunidades} oportunidade(s) · UF(s){' '}

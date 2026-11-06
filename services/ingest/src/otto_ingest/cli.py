@@ -31,6 +31,30 @@ def ingest(days: int | None, uf: str | None) -> None:
     )
 
 
+@main.command("reclassify-nicho")
+def reclassify_nicho_cmd() -> None:
+    """Reclassifica nichos no SQLite local (idempotente; preserva origem=usuario)."""
+    from otto_core.db import get_connection, init_db, reclassify_nicho_all
+
+    conn = get_connection()
+    init_db(conn)
+    try:
+        out = reclassify_nicho_all(conn)
+    finally:
+        conn.close()
+
+    click.echo("Reclassificação de nichos (local)")
+    click.echo(f"  Total: {out['total']} | alterados: {out['nicho_ou_confianca_alterados']} | "
+               f"preservados (manual): {out['preservados_revisao_manual']}")
+    click.echo("  Antes:")
+    for k, v in sorted(out["antes_por_nicho"].items(), key=lambda x: -x[1]):
+        click.echo(f"    {k}: {v}")
+    click.echo("  Depois:")
+    for k, v in sorted(out["depois_por_nicho"].items(), key=lambda x: -x[1]):
+        click.echo(f"    {k}: {v}")
+    click.echo(f"  Outros (depois): {out['outros_depois']}")
+
+
 @main.command("alertas")
 @click.option("--hours", default=24, type=int, help="Janela retroativa em horas")
 @click.option("--uf", default="PI", help="UF")

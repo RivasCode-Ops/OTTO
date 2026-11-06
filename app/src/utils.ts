@@ -31,8 +31,13 @@ export function daysUntil(iso?: string | null): number | null {
   return Math.round((end.getTime() - now.getTime()) / 86400000);
 }
 
-/** Cadastros manuais de teste — fora de destaque/KPIs (e da lista do radar). */
+/**
+ * Cadastros de teste: prefixo MANUAL- no número, ou manual com objeto
+ * TESTE… / Import JSON teste…
+ */
 export function isRegistroTeste(o: Oportunidade): boolean {
+  const num = (o.numero_controle_pncp || '').trim();
+  if (num.toUpperCase().startsWith('MANUAL-')) return true;
   if (o.origem_registro !== 'manual') return false;
   const obj = (o.objeto_compra || '').trim();
   return (
@@ -52,27 +57,81 @@ export function labelCategoria(o: Oportunidade): string {
 
 /**
  * Filtro de prazo:
- * - sempre exclui vencidas (daysUntil < 0);
- * - `abertas`: não vencidas (sem data permanece);
- * - dias < 3650: exige data e daysUntil ∈ [0, dias];
- * - dias ≥ 3650: qualquer prazo não vencido (sem data ok).
+ * - `abertas`: exclui vencidas; sem data permanece;
+ * - dias < 3650: exige data e daysUntil ∈ [0, dias] (exclui vencidas e sem prazo);
+ * - dias ≥ 3650 (Qualquer prazo): inclui vencidas e sem prazo.
  */
 export type FiltroPrazo = number | 'abertas';
 
 export function passaFiltroPrazo(o: Oportunidade, dias: FiltroPrazo): boolean {
   const d = daysUntil(o.data_encerramento);
-  if (d !== null && d < 0) return false;
-  if (dias === 'abertas') return true;
+  if (dias === 'abertas') {
+    return !(d !== null && d < 0);
+  }
   if (dias < 3650) {
     if (d === null) return false;
+    if (d < 0) return false;
     return d <= dias;
   }
+  // Qualquer prazo: tudo.
   return true;
 }
 
 /** Contagem alinhada ao KPI “Prazo ≤ N dias” (mesma regra do filtro). */
 export function countPrazoAte(items: Oportunidade[], diasMax: number): number {
   return items.filter((o) => passaFiltroPrazo(o, diasMax)).length;
+}
+
+/**
+ * KPI Oportunidades: total no escopo da lista — nunca o length da página filtrada.
+ * DECISÃO (2026-11-06): com escopo `config`, não cair no total do banco inteiro
+ * (histórico de outras UFs); preferir total_no_escopo da cobertura se /api/kpis
+ * ainda devolver o total global (API antiga / worker órfão).
+ */
+export function resolveKpiTotalBanco(opts: {
+  kpisTotal?: number | null;
+  /** total_no_escopo da cobertura (UFs da coleta). */
+  coberturaEscopoTotal?: number | null;
+  /** banco.total_oportunidades (todas as UFs no SQLite). */
+  coberturaBancoTotal?: number | null;
+  /** @deprecated use coberturaBancoTotal / coberturaEscopoTotal */
+  coberturaTotal?: number | null;
+  escopoUf?: 'config' | 'todas';
+}): number {
+  const escopo = opts.escopoUf ?? 'config';
+  const bancoTotal =
+    typeof opts.coberturaBancoTotal === 'number' && Number.isFinite(opts.coberturaBancoTotal)
+      ? opts.coberturaBancoTotal
+      : typeof opts.coberturaTotal === 'number' && Number.isFinite(opts.coberturaTotal)
+        ? opts.coberturaTotal
+        : null;
+  const escopoTotal =
+    typeof opts.coberturaEscopoTotal === 'number' && Number.isFinite(opts.coberturaEscopoTotal)
+      ? opts.coberturaEscopoTotal
+      : null;
+  const kpisTotal =
+    typeof opts.kpisTotal === 'number' && Number.isFinite(opts.kpisTotal) ? opts.kpisTotal : null;
+
+  if (escopo === 'todas') {
+    if (kpisTotal != null) return kpisTotal;
+    if (bancoTotal != null) return bancoTotal;
+    return 0;
+  }
+
+  // config: se KPI == banco inteiro e cobertura tem escopo menor, KPI ignorou o filtro
+  if (kpisTotal != null) {
+    if (
+      escopoTotal != null &&
+      bancoTotal != null &&
+      kpisTotal === bancoTotal &&
+      escopoTotal < bancoTotal
+    ) {
+      return escopoTotal;
+    }
+    return kpisTotal;
+  }
+  if (escopoTotal != null) return escopoTotal;
+  return 0;
 }
 
 export type ScoreTier = 'high' | 'mid' | 'low';
@@ -106,14 +165,39 @@ export function highlightReason(o: Oportunidade, modo: 'geral' | 'ti' = 'geral')
   return parts.slice(0, 3).join(' · ');
 }
 
+export const NICHO_LABELS: Record<string, string> = {
+  ti_software: 'TI / software',
+  saude_medicamentos: 'Saúde / medicamentos',
+  obras_engenharia: 'Obras / engenharia',
+  passagens_viagens: 'Passagens / viagens',
+  alimentos_merenda: 'Alimentos / merenda',
+  material_escritorio_papelaria: 'Material de escritório',
+  limpeza_conservacao: 'Limpeza / conservação',
+  veiculos_combustiveis: 'Veículos / combustíveis',
+  outros: 'Outros',
+};
+
+export function labelNicho(nicho: string | null | undefined): string {
+  if (!nicho) return 'Outros';
+  return NICHO_LABELS[nicho] || nicho;
+}
+
 export function filterOportunidades(
   items: Oportunidade[],
-  opts: { q: string; dias: FiltroPrazo; somenteAlta: boolean; ocultarTestes?: boolean },
+  opts: {
+    q: string;
+    dias: FiltroPrazo;
+    somenteAlta: boolean;
+    ocultarTestes?: boolean;
+    nicho?: string | null;
+  },
 ): Oportunidade[] {
   const q = opts.q.trim().toLowerCase();
   const ocultarTestes = opts.ocultarTestes !== false;
+  const nicho = opts.nicho && opts.nicho !== 'todos' ? opts.nicho : null;
   return items.filter((o) => {
     if (ocultarTestes && isRegistroTeste(o)) return false;
+    if (nicho && (o.nicho || 'outros') !== nicho) return false;
     if (opts.somenteAlta && o.confianca_classificacao !== 'alta') return false;
     if (!passaFiltroPrazo(o, opts.dias)) return false;
     if (!q) return true;
@@ -142,7 +226,8 @@ export function pickPriority(
     ordenacao: 'publicacao',
   },
 ): Oportunidade[] {
-  const sorted = items.filter((o) => !isRegistroTeste(o));
+  // Caller já aplica ocultar testes / filtros; não filtra de novo aqui.
+  const sorted = [...items];
   if (opts.modo === 'ti') {
     const alta = sorted
       .filter((o) => o.confianca_classificacao === 'alta')
@@ -153,7 +238,6 @@ export function pickPriority(
       .sort((a, b) => b.score_total - a.score_total);
     return [...alta, ...rest].slice(0, n);
   }
-  // Lista geral: não usar score TI — respeitar ordenação ativa.
   if (opts.ordenacao === 'prazo') {
     sorted.sort((a, b) => {
       if (!a.data_encerramento && !b.data_encerramento) return 0;

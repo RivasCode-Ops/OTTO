@@ -944,10 +944,10 @@
     {
       "id": "§14",
       "titulo": "Especializações Saúde/Viagens",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Nucleo multi-setor generico; README Fase 4 / especializacoes.",
-      "falta": "Seguir fase prevista no README (nao antecipar).",
-      "bloqueio": "Fase prevista no README"
+      "status": "implementado_validado",
+      "evidencia": "otto_core.especializacao (subtipos/condicoes so com sinal no objeto); GET /especializacao; EspecializacaoPanel no detalhe; docs/NICHOS.md; pytest test_especializacao. Sem LX Saude / app viagens.",
+      "falta": "— (leitura de anexos PDF/DOCX para requisitos setoriais continua fora deste lote).",
+      "bloqueio": "Nenhum para o escopo autorizado"
     },
     {
       "id": "§15",

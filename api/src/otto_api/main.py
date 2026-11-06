@@ -65,6 +65,7 @@ from otto_core.ia_analise_store import (
     rejeitar_sugestao,
     status_ia,
 )
+from otto_core.especializacao import classificar_especializacao
 from otto_core.orgaos_store import (
     add_classificacao,
     concorrencia_status,
@@ -599,6 +600,23 @@ def api_concorrencia() -> dict:
     conn = get_connection()
     try:
         return concorrencia_status(conn)
+    finally:
+        conn.close()
+
+
+@app.get("/api/oportunidades/{numero:path}/especializacao")
+def api_get_especializacao(numero: str) -> dict:
+    """§14 — Saúde/Viagens a partir do objeto (sem inventar exigências)."""
+    conn = get_connection()
+    try:
+        opp = get_oportunidade(conn, numero)
+        if not opp:
+            raise HTTPException(404, "Oportunidade não encontrada")
+        return classificar_especializacao(
+            opp.objeto_compra or "",
+            opp.nicho,
+            orgao=opp.orgao_razao_social or "",
+        )
     finally:
         conn.close()
 

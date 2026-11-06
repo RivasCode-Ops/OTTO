@@ -4,6 +4,7 @@ import type { Acompanhamento, DecisaoUsuario, Evento, Oportunidade } from '../ty
 import { ClassificacaoPanel } from './ClassificacaoPanel';
 import { ContinuidadePanel } from './ContinuidadePanel';
 import { DocsAnalisePanel } from './DocsAnalisePanel';
+import { EspecializacaoPanel } from './EspecializacaoPanel';
 import { ItensLotesPanel } from './ItensLotesPanel';
 import { OrientacaoPanel } from './OrientacaoPanel';
 import { RequisitosPanel } from './RequisitosPanel';
@@ -371,6 +372,7 @@ export function DetailDrawer({
               {erro && <p className="acomp__err">{erro}</p>}
             </section>
 
+            <EspecializacaoPanel numero={o.numero_controle_pncp} nicho={o.nicho} />
             <ClassificacaoPanel numero={o.numero_controle_pncp} />
             <OrientacaoPanel numero={o.numero_controle_pncp} />
             <RequisitosPanel numero={o.numero_controle_pncp} />

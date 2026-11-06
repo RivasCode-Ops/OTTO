@@ -909,6 +909,21 @@ export async function checklistFromRequisito(numero: string, reqId: number): Pro
   await ensureOk(r, 'Falha ao criar tarefa a partir do requisito');
 }
 
+export async function fetchEspecializacao(numero: string) {
+  const r = await fetch(oppPath(numero, '/especializacao'));
+  await ensureOk(r, 'Falha especialização');
+  return r.json() as Promise<{
+    especializacao: 'saude' | 'viagens' | null;
+    rotulo?: string | null;
+    nicho?: string | null;
+    nicho_rotulo?: string | null;
+    subtipos: { id: string; rotulo: string; sinais: string[]; fonte: string }[];
+    condicoes_mencionadas: { id: string; rotulo: string; sinais: string[]; fonte: string }[];
+    aviso: string;
+    limitacoes: string[];
+  }>;
+}
+
 export async function fetchClassificacoes(numero: string) {
   const r = await fetch(oppPath(numero, '/classificacoes'));
   await ensureOk(r, 'Falha classificações');

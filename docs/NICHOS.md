@@ -48,8 +48,18 @@ Idempotente. **Não** altera registros com `origem=usuario` / `revisado_pelo_usu
 
 ---
 
+## Especializações §14 (Saúde / Viagens)
+
+Quando o nicho for `saude_medicamentos` ou `passagens_viagens`, o detalhe da
+oportunidade mostra subtipos e condições **só se o texto do objeto** trouxer
+sinais (`otto_core.especializacao`). Não inventa exigências pela categoria.
+API: `GET /api/oportunidades/{numero}/especializacao`.
+
+---
+
 ## Painel
 
 - Filtro **UF**: coleta (padrão) · cada UF do banco · Todas  
 - Filtro **Nicho**: Todos + setores com contagem (respeita UF + prazo ativos)  
 - Regiões / Categorias: clique aplica filtro e volta à Lista geral  
+

@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Dados locais
+data/*.db
+data/*.db-journal
+data/*.db.bak*
+data/raw/
+data/documentos/
+data/backups/
+data/restore-test-*/
+data/ia-models/
+data/test-docs-*/
+data/OllamaSetup.exe
+data/_e2e_*
+data/_fix_*
+data/_make_*
+data/_tmp*
+data/e2e-*
+logs/
+
+# Cursor local
+.cursor/
+
+# Env
+.env
+.env.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

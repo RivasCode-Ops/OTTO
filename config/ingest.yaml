@@ -1,0 +1,15 @@
+# Coleta PNCP — MVP São Paulo
+ufs:
+  - PI
+
+# Modalidades (Lei 14.133) — 6 = Pregão Eletrônico
+modalidades:
+  - 6
+
+tamanho_pagina: 50
+pausa_entre_paginas_seg: 0.3
+janela_dias_padrao: 7
+max_retries: 3
+
+# Endpoint público de consulta (sem login)
+base_url: https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao

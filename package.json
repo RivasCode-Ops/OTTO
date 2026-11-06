@@ -1,0 +1,10 @@
+{
+  "name": "otto",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:app": "npm run dev --prefix app",
+    "typecheck": "npm run typecheck --prefix app",
+    "test": "pytest packages/otto-core/tests -q"
+  }
+}

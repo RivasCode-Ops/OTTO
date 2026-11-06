@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Acompanhar a construção do LICITAR</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --muted: #656d76;
+      --accent: #0969da;
+      --ok-bg: #dafbe1;
+      --ok: #1a7f37;
+      --run-bg: #ddf4ff;
+      --run: #0550ae;
+      --todo-bg: #fff8c5;
+      --todo: #9a6700;
+      --need-bg: #ffebe9;
+      --need: #cf222e;
+      --prep: #8250df;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      font-size: 16px;
+    }
+    header {
+      padding: 1.5rem 1.25rem 1.25rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+    .sub { color: var(--muted); margin: 0 0 0.75rem; }
+    .stamp {
+      display: inline-block;
+      background: #eaeef2;
+      border-radius: 6px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.9rem;
+    }
+    .banner {
+      margin-top: 0.85rem;
+      padding: 0.75rem 1rem;
+      background: #fff8c5;
+      border: 1px solid #d4a72c;
+      border-radius: 8px;
+      color: #7d4e00;
+      font-size: 0.95rem;
+    }
+    .idle {
+      margin-top: 0.75rem;
+      padding: 0.65rem 1rem;
+      background: #eaeef2;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 1.25rem 1.25rem 3rem; }
+    .quatro {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (min-width: 720px) {
+      .quatro { grid-template-columns: 1fr 1fr; }
+    }
+    .caixa {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .caixa h2 {
+      margin: 0 0 0.5rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .caixa.feito { border-left: 4px solid var(--ok); }
+    .caixa.feito h2 { color: var(--ok); }
+    .caixa.ando { border-left: 4px solid var(--run); }
+    .caixa.ando h2 { color: var(--run); }
+    .caixa.falta { border-left: 4px solid var(--todo); }
+    .caixa.falta h2 { color: var(--todo); }
+    .caixa.voce { border-left: 4px solid var(--need); }
+    .caixa.voce h2 { color: var(--need); }
+    .caixa ul { margin: 0; padding-left: 1.2rem; }
+    .caixa li { margin: 0.35rem 0; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.15rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    section > h2 {
+      margin: 0 0 1rem;
+      font-size: 1.15rem;
+      color: var(--accent);
+    }
+    .etapa {
+      border-top: 1px solid var(--border);
+      padding: 1rem 0;
+    }
+    .etapa:first-of-type { border-top: none; padding-top: 0; }
+    .etapa h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 650;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      margin-left: 0.35rem;
+      vertical-align: middle;
+    }
+    .b-prep { background: #fbefff; color: var(--prep); }
+    .b-ok { background: var(--ok-bg); color: var(--ok); }
+    .b-plan { background: var(--todo-bg); color: var(--todo); }
+    .b-parcial { background: var(--run-bg); color: var(--run); }
+    .b-ando { background: var(--run-bg); color: var(--run); }
+    .campo { margin: 0.45rem 0; }
+    .campo strong { display: inline; }
+    .rotulo { color: var(--muted); font-size: 0.9rem; }
+    details.bloco {
+      margin-top: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      background: #f6f8fa;
+    }
+    details.bloco summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .decisao {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .decisao.urgente { border-left: 4px solid var(--need); }
+    .decisao.depois { border-left: 4px solid var(--muted); }
+    .pill-momento {
+      font-size: 0.8rem;
+      font-weight: 650;
+      display: inline-block;
+      margin-bottom: 0.5rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+    }
+    .m-urgente { background: var(--need-bg); color: var(--need); }
+    .m-depois { background: #eaeef2; color: var(--muted); }
+    .hist { border-bottom: 1px solid var(--border); padding: 0.85rem 0; }
+    .hist:last-child { border-bottom: none; }
+    .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; }
+    .err {
+      background: var(--need-bg);
+      border: 1px solid var(--need);
+      color: var(--need);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+    .proxima {
+      background: #ddf4ff;
+      border: 1px solid #54aeff;
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+    }
+    .proxima h2 { margin: 0 0 0.5rem; color: var(--run); font-size: 1.05rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="titulo">Acompanhar a construção do LICITAR</h1>
+    <p class="sub" id="subtitulo"></p>
+    <div class="stamp">Última atualização dos registros: <strong id="atualizado">—</strong></div>
+    <div class="banner" id="aviso"></div>
+    <div class="idle" id="idle" hidden></div>
+  </header>
+
+  <main>
+    <div id="erro" class="err" hidden></div>
+
+    <div class="proxima" id="onde"></div>
+
+    <div class="quatro" id="quatro"></div>
+
+    <section>
+      <h2>1. Caminho do projeto</h2>
+      <p class="rotulo">Preparação ≠ aplicativo pronto. Etapas futuras são plano, não entrega feita.</p>
+      <div id="caminho"></div>
+    </section>
+
+    <section id="sec-ia-local">
+      <h2>1b. Validação da IA local (distinções)</h2>
+      <p class="rotulo">Integração ≠ qualidade ≠ evidência ≠ desempenho. Testes pendentes ficam explícitos.</p>
+      <div id="ia-local-validacao"></div>
+    </section>
+
+    <section>
+      <h2>2. Cada entrega explicada</h2>
+      <div id="entregas"></div>
+    </section>
+
+    <section>
+      <h2>2b. Confrontação README × código (por requisito)</h2>
+      <p class="rotulo">Status real — não basta existir uma tela. Evidência e o que falta em cada item.</p>
+      <div id="requisitos"></div>
+    </section>
+
+    <section>
+      <h2>3. Decisões que precisam de você</h2>
+      <div id="respondidas"></div>
+      <div id="decisoes"></div>
+    </section>
+
+    <section>
+      <h2>4. Como você pode conferir</h2>
+      <div id="conferir"></div>
+    </section>
+
+    <section>
+      <h2>5. Histórico</h2>
+      <div id="historico"></div>
+    </section>
+
+    <section>
+      <h2>Detalhes técnicos (opcional)</h2>
+      <p class="rotulo">Só se alguém for mexer em código ou pedirem evidência de teste. Não é necessário para acompanhar o projeto.</p>
+      <div id="tecnico"></div>
+    </section>
+  </main>
+
+  <script src="dados.js"></script>
+  <script>
+    (function () {
+      function esc(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      }
+      function ul(items) {
+        if (!items || !items.length) return "<p class=\"rotulo\">—</p>";
+        return "<ul>" + items.map(function (i) {
+          if (typeof i === "string") return "<li>" + esc(i) + "</li>";
+          return "<li><strong>" + esc(i.pergunta_curta) + "</strong><br><span class=\"rotulo\">Impede: " + esc(i.impede) + "</span></li>";
+        }).join("") + "</ul>";
+      }
+      function badgeStatusReq(s) {
+        if (s === "implementado_validado") return '<span class="badge b-ok">Implementado e validado</span>';
+        if (s === "implementado_validado_com_ressalvas") return '<span class="badge b-parcial">Validado com ressalvas</span>';
+        if (s === "implementado_parcial") return '<span class="badge b-parcial">Implementado parcialmente</span>';
+        if (s === "nao_implementado") return '<span class="badge b-plan">Não implementado</span>';
+        if (s === "dependente_decisao") return '<span class="badge b-ando">Dependente de decisão</span>';
+        if (s === "fora_escopo_aprovado") return '<span class="badge b-prep">Fora do escopo aprovado</span>';
+        if (s === "prevista_aguardando_autorizacao") return '<span class="badge b-prep">Prevista, aguardando autorização</span>';
+        if (s === "implementada_fora_escopo_aguardando_avaliacao") return '<span class="badge b-prep">Implementada fora do escopo — aguardando avaliação</span>';
+        return '<span class="badge b-plan">' + esc(s) + "</span>";
+      }
+      function badgeTipo(t) {
+        if (t === "preparacao") return '<span class="badge b-prep">Preparação</span>';
+        if (t === "existente_parcialmente_verificada") return '<span class="badge b-parcial">Já existe (conferência parcial)</span>';
+        if (t === "em_andamento") return '<span class="badge b-ando">Em andamento</span>';
+        if (t === "implementada_testada_parcial") return '<span class="badge b-ok">Feita (teste automático; tela a homologar)</span>';
+        if (t === "planejada") return '<span class="badge b-plan">Planejada</span>';
+        return '<span class="badge b-plan">' + esc(t) + "</span>";
+      }
+
+      var data = window.LICITAR_ACOMPANHAMENTO;
+      var err = document.getElementById("erro");
+      if (!data) {
+        err.hidden = false;
+        err.textContent = "Não foi possível carregar os registros (dados.js). Peça para atualizar o espelho ou abra de novo o painel.html desta pasta.";
+        return;
+      }
+
+      var m = data.meta || {};
+      document.getElementById("titulo").textContent = m.titulo || "LICITAR";
+      document.getElementById("subtitulo").textContent = m.subtitulo || "";
+      document.getElementById("atualizado").textContent = m.atualizado_em || "—";
+      document.getElementById("aviso").textContent = m.aviso_atualizacao || "";
+
+      var r = data.resumo_topo || {};
+      var emExec = (r.esta_sendo_feito || []).length > 0;
+      var idle = document.getElementById("idle");
+      if (!emExec) {
+        idle.hidden = false;
+        idle.textContent = r.mensagem_sem_execucao || "Nenhuma tarefa em execução neste momento.";
+      }
+
+      document.getElementById("onde").innerHTML =
+        "<h2>Onde o projeto está agora</h2>" +
+        "<p>" + esc(m.onde_esta_o_projeto) + "</p>" +
+        "<p><strong>Próxima entrega proposta:</strong> " + esc((m.proxima_entrega_proposta || {}).nome) +
+        " — <em>" + esc((m.proxima_entrega_proposta || {}).status) + "</em></p>" +
+        "<p class=\"rotulo\">" + esc(m.como_abrir) + "</p>";
+
+      (function renderIaLocal() {
+        var box = document.getElementById("ia-local-validacao");
+        var ia = data.ia_local_validacao;
+        if (!box) return;
+        if (!ia) {
+          box.innerHTML = "<p class=\"rotulo\">Sem bloco de validação IA neste registro.</p>";
+          return;
+        }
+        function bloco(titulo, obj) {
+          if (!obj) return "";
+          var extra = "";
+          if (obj.carregamento_s != null) {
+            extra += "<br><span class=\"rotulo\">Load: " + esc(obj.carregamento_s) + "s · Análise PDF: " +
+              esc(obj.analise_pdf_4pags_s) + "s · consumo_modelo: " + esc(obj.consumo_modelo) +
+              " · RSS llama-server: " + esc(obj.rss_llama_server_mb_observado) + " MB</span>";
+          }
+          return "<div class=\"etapa\"><h3>" + esc(titulo) + " " +
+            '<span class="badge b-parcial">' + esc(obj.status) + "</span></h3>" +
+            "<p>" + esc(obj.detalhe || "") + "</p>" + extra + "</div>";
+        }
+        var pend = (ia.testes_pendentes || []).map(function (t) {
+          return "<li>" + esc(t) + "</li>";
+        }).join("");
+        function lista(titulo, arr, cls) {
+          if (!arr || !arr.length) return "";
+          return "<div class=\"etapa\"><h3>" + esc(titulo) + "</h3><ul class=\"" + (cls || "") + "\">" +
+            arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></div>";
+        }
+        var ie = data.como_iniciar_encerrar || {};
+        var ieHtml = "";
+        if (ie.iniciar || ie.encerrar) {
+          ieHtml = "<div class=\"etapa\"><h3>Iniciar e encerrar</h3>" +
+            "<p class=\"rotulo\">Iniciar</p>" + ul(ie.iniciar || []) +
+            "<p class=\"rotulo\">Encerrar</p>" + ul(ie.encerrar || []) +
+            "<p class=\"rotulo\">Limitações visíveis</p>" + ul(ie.limitacoes_visiveis || []) +
+            (ie.oportunidades_teste && ie.oportunidades_teste.length
+              ? "<p class=\"rotulo\">Oportunidades / docs de teste (preservados)</p><ul>" +
+                ie.oportunidades_teste.map(function (o) {
+                  return "<li><strong>" + esc(o.numero) + "</strong> — " + esc(o.objeto) +
+                    " · " + esc(o.doc) + "</li>";
+                }).join("") + "</ul>"
+              : "") +
+            "</div>";
+        }
+        var roteiro = data.roteiro_teste_usuario;
+        var roteiroHtml = "";
+        if (roteiro) {
+          roteiroHtml = "<div class=\"etapa\"><h3>" + esc(roteiro.titulo || "Roteiro") + "</h3>" +
+            ul(roteiro.passos || []) +
+            "<p class=\"rotulo\">O que conferir</p>" + ul(roteiro.o_que_conferir || []) + "</div>";
+        }
+        box.innerHTML =
+          ieHtml +
+          lista("O que funciona e foi testado", ia.o_que_funciona_e_foi_testado) +
+          lista("Limitações conhecidas", ia.limitacoes_conhecidas) +
+          lista("Testes ainda pendentes", ia.testes_pendentes || ia.testes_pendentes) +
+          lista("Aguardando autorização", ia.aguardando_autorizacao) +
+          bloco("Integração", ia.integracao) +
+          bloco("Qualidade da extração", ia.qualidade_extracao) +
+          bloco("Evidências verificadas", ia.evidencias_verificadas) +
+          bloco("Limitações de desempenho", ia.desempenho) +
+          (pend && !(ia.testes_pendentes && ia.testes_pendentes.length) ? "<div class=\"etapa\"><h3>Testes pendentes</h3><ul>" + pend + "</ul></div>" : "") +
+          roteiroHtml;
+      })();
+
+      document.getElementById("quatro").innerHTML =
+        '<div class="caixa feito"><h2>Já foi feito</h2>' + ul(r.ja_foi_feito) + "</div>" +
+        '<div class="caixa ando"><h2>Está sendo feito</h2>' +
+          (emExec ? ul(r.esta_sendo_feito) : "<p><strong>" + esc(r.mensagem_sem_execucao) + "</strong></p>") +
+        "</div>" +
+        '<div class="caixa falta"><h2>Falta fazer</h2>' + ul(r.falta_fazer) + "</div>" +
+        '<div class="caixa voce"><h2>Precisa de mim</h2>' + ul(r.precisa_de_mim) + "</div>";
+
+      document.getElementById("caminho").innerHTML = (data.caminho_etapas || []).map(function (e) {
+        var sitBadge = /conclu/i.test(e.situacao_atual || "")
+          ? '<span class="badge b-ok">Situação: feita (preparação ou base)</span>'
+          : '<span class="badge b-plan">Situação: ainda planejada</span>';
+        return '<div class="etapa"><h3>' + esc(e.numero) + ". " + esc(e.nome) + " " + badgeTipo(e.tipo) + " " + sitBadge + "</h3>" +
+          '<div class="campo"><span class="rotulo">O que será feito:</span> ' + esc(e.o_que_sera_feito) + "</div>" +
+          '<div class="campo"><span class="rotulo">Para que serve:</span> ' + esc(e.para_que_serve) + "</div>" +
+          '<div class="campo"><span class="rotulo">O que você poderá fazer no app:</span> ' + esc(e.o_que_poderei_fazer) + "</div>" +
+          '<div class="campo"><span class="rotulo">Como verificaremos:</span> ' + esc(e.como_verificar) + "</div>" +
+          '<div class="campo"><span class="rotulo">Situação atual:</span> ' + esc(e.situacao_atual) + "</div></div>";
+      }).join("");
+
+      document.getElementById("entregas").innerHTML = (data.entregas || []).map(function (e) {
+        return '<div class="etapa"><h3>' + esc(e.nome) + " " + badgeTipo(e.tipo) + "</h3>" +
+          '<div class="campo"><strong>O que significa:</strong> ' + esc(e.o_que_significa) + "</div>" +
+          '<div class="campo"><strong>O que muda para mim:</strong> ' + esc(e.o_que_muda_para_mim) + "</div>" +
+          '<div class="campo"><strong>Situação:</strong> ' + esc(e.situacao) + "</div>" +
+          '<div class="campo"><strong>Como conferir:</strong> ' + esc(e.como_conferir) + "</div>" +
+          '<div class="campo"><strong>O que falta:</strong> ' + esc(e.o_que_falta) + "</div>" +
+          '<div class="campo"><strong>Depende de alguma decisão minha?</strong> ' +
+            (e.depende_de_decisao_minha ? "Sim" : "Não") + "</div>" +
+          (e.comprovacao
+            ? '<details class="bloco"><summary>Evidência / detalhe técnico</summary><p class="mono">' + esc(e.comprovacao) + "</p></details>"
+            : "") +
+          "</div>";
+      }).join("");
+
+      document.getElementById("requisitos").innerHTML = (data.requisitos_readme || []).map(function (q) {
+        return '<div class="etapa"><h3>' + esc(q.id) + " — " + esc(q.titulo) + " " + badgeStatusReq(q.status) + "</h3>" +
+          '<div class="campo"><strong>Evidência:</strong> ' + esc(q.evidencia) + "</div>" +
+          '<div class="campo"><strong>O que falta:</strong> ' + esc(q.falta) + "</div>" +
+          '<div class="campo"><strong>Bloqueio:</strong> ' + esc(q.bloqueio) + "</div></div>";
+      }).join("") || "<p class=\"rotulo\">Lista de requisitos ainda não sincronizada.</p>";
+
+      var resp = data.decisoes_ja_respondidas || [];
+      document.getElementById("respondidas").innerHTML = resp.length
+        ? "<p><strong>Já respondidas (não perguntar de novo)</strong></p><ul>" +
+          resp.map(function (d) {
+            return "<li>" + esc(d.pergunta) + "<br><strong>Resposta:</strong> " + esc(d.resposta) +
+              ' <span class="rotulo">(' + esc(d.quando) + ")</span></li>";
+          }).join("") + "</ul>"
+        : "";
+
+      document.getElementById("decisoes").innerHTML = (data.decisoes_para_mim || []).map(function (d) {
+        var urgente = d.momento === "necessaria_para_proxima_entrega";
+        return '<div class="decisao ' + (urgente ? "urgente" : "depois") + '">' +
+          '<div class="pill-momento ' + (urgente ? "m-urgente" : "m-depois") + '">' +
+            (urgente ? "Precisa para a próxima entrega proposta" : "Pode ficar para depois") +
+          "</div>" +
+          "<h3 style=\"margin:0 0 0.5rem;font-size:1rem\">" + esc(d.pergunta) + "</h3>" +
+          '<div class="campo"><span class="rotulo">Por que precisa de resposta:</span> ' + esc(d.por_que) + "</div>" +
+          '<div class="campo"><span class="rotulo">Opções:</span><ol>' +
+            (d.opcoes || []).map(function (o) { return "<li>" + esc(o) + "</li>"; }).join("") +
+          "</ol></div>" +
+          '<div class="campo"><strong>Recomendação:</strong> ' + esc(d.recomendacao) + "</div>" +
+          '<div class="campo"><span class="rotulo">Motivo:</span> ' + esc(d.motivo_recomendacao) + "</div>" +
+          '<div class="campo"><span class="rotulo">O que fica impedido sem resposta:</span> ' + esc(d.o_que_fica_impedido) + "</div>" +
+          '<details class="bloco"><summary>Código interno (opcional)</summary><p class="mono">' + esc(d.id) + "</p></details>" +
+          "</div>";
+      }).join("");
+
+      document.getElementById("conferir").innerHTML = (data.como_conferir || []).map(function (c) {
+        return '<div class="etapa"><h3>' + esc(c.entrega) + "</h3>" +
+          '<div class="campo"><span class="rotulo">Onde abrir:</span> ' + esc(c.onde_abrir) + "</div>" +
+          '<div class="campo"><span class="rotulo">O que fazer:</span> ' + esc(c.o_que_fazer) + "</div>" +
+          '<div class="campo"><span class="rotulo">Resultado esperado:</span> ' + esc(c.resultado_esperado) + "</div>" +
+          '<div class="campo"><span class="rotulo">Ainda não disponível:</span> ' + esc(c.ainda_nao_disponivel) + "</div></div>";
+      }).join("");
+
+      document.getElementById("historico").innerHTML = (data.historico_usuario || []).map(function (h) {
+        return '<div class="hist"><div class="mono">' + esc(h.quando) + "</div>" +
+          '<div class="campo"><strong>O que mudou:</strong> ' + esc(h.o_que_mudou) + "</div>" +
+          '<div class="campo"><strong>Concluído:</strong> ' + esc(h.o_que_foi_concluido) + "</div>" +
+          '<div class="campo"><strong>Problemas / não testado:</strong> ' + esc(h.problemas_encontrados) + "</div>" +
+          '<div class="campo"><strong>Próxima entrega proposta:</strong> ' + esc(h.proxima_entrega_proposta) + "</div></div>";
+      }).join("");
+
+      var tec = data.tecnico || {};
+      var evs = data.evidencias_tecnicas || [];
+      document.getElementById("tecnico").innerHTML =
+        '<details class="bloco" open><summary>Mapa interno e testes</summary>' +
+        "<p>" + esc(tec.nota) + "</p>" +
+        "<p class=\"mono\">Fonte: " + esc(tec.fonte_canonica) + " · Espelho: " + esc(tec.espelho_painel) +
+        " · Sync: " + esc(tec.sync) + "</p>" +
+        "<p>Lote interno: " + esc(tec.lote_interno_atual) + "</p>" +
+        "<p>Lotes: " + esc((tec.mapa_lotes || []).map(function (l) {
+          return l.id + "=" + l.estado;
+        }).join("; ")) + "</p>" +
+        "<p><strong>Evidências de teste:</strong></p>" +
+        evs.map(function (e) {
+          return "<p class=\"mono\">" + esc(e.quando) + " — " + esc(e.comando) + " → " + esc(e.resultado) +
+            "<br>Não executado: " + esc((e.nao_executado || []).join("; ")) + "</p>";
+        }).join("") +
+        "</details>";
+    })();
+  </script>
+</body>
+</html>

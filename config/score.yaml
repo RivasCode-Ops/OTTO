@@ -1,0 +1,36 @@
+pesos:
+  valor: 0.40
+  urgencia: 0.30
+  nicho: 0.20
+  recorrencia: 0.10
+
+valor_faixas:
+  - max: 100000
+    pontos: 20
+  - max: 500000
+    pontos: 50
+  - max: 1000000
+    pontos: 70
+  - max: null
+    pontos: 100
+
+urgencia_dias:
+  - max: 3
+    pontos: 100
+  - max: 7
+    pontos: 80
+  - max: 15
+    pontos: 60
+  - max: 30
+    pontos: 40
+  - max: null
+    pontos: 20
+
+nicho:
+  ti_alta: 100
+  ti_baixa: 60
+  outros: 10
+
+recorrencia:
+  por_ocorrencia: 15
+  max_pontos: 100

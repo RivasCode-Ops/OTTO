@@ -7,6 +7,7 @@ from pathlib import Path
 from otto_core.db import init_db
 from otto_core.orgaos_store import (
     add_classificacao,
+    calcular_prioridade_orgao,
     concorrencia_status,
     ensure_classificacoes_basicas,
     get_orgao,
@@ -73,11 +74,20 @@ def test_orgaos_categorias_concorrencia_insuficiente(tmp_path: Path):
     lista = list_orgaos(conn, limit=50)
     assert lista["total"] >= 2
     assert all("n_oportunidades" in x for x in lista["items"])
+    assert all("prioridade_score" in x and "motivos_prioridade" in x for x in lista["items"])
+    assert "reputação" in " ".join(lista["limitacoes"]).lower() or "não é reputação" in lista[
+        "aviso"
+    ].lower()
+    # ORGAO A tem 2 oportunidades → deve ranquear acima de B (1)
+    assert lista["items"][0]["n_oportunidades"] >= lista["items"][1]["n_oportunidades"]
+    assert lista["items"][0]["prioridade_score"] >= lista["items"][1]["prioridade_score"]
+    assert lista["items"][0]["motivos_prioridade"]
 
     chave = next(x["orgao_chave"] for x in lista["items"] if x["cnpj"] == "12345678000123")
     det = get_orgao(conn, chave)
     assert det is not None
     assert det["historico_disponivel"]["n_registros"] >= 1
+    assert det["orgao"]["motivos_prioridade"]
 
     add_classificacao(conn, "ORG-0", setor="saude", categoria="materiais")
     cats = visao_categorias(conn)
@@ -104,3 +114,35 @@ def test_orgaos_categorias_concorrencia_insuficiente(tmp_path: Path):
     assert "editais" not in (conc["detalhe"] or "").lower() or "NÃO" in (conc["detalhe"] or "")
 
     conn.close()
+
+
+def test_calcular_prioridade_orgao_explicavel_sem_reputacao():
+    basico = calcular_prioridade_orgao(
+        n_oportunidades=2,
+        n_setores=1,
+        valor_estimado_soma=100.0,
+        data_max_publicacao="2099-01-01",
+        n_abertas=1,
+        n_interesse_ou_salva=0,
+        n_participacao=0,
+        n_resultado=0,
+        tem_anotacao=False,
+    )
+    assert basico["prioridade_score"] > 0
+    assert any("oportunidade" in m.lower() for m in basico["motivos_prioridade"])
+    assert not any("reputa" in m.lower() for m in basico["motivos_prioridade"])
+
+    com_usuario = calcular_prioridade_orgao(
+        n_oportunidades=1,
+        n_setores=0,
+        valor_estimado_soma=None,
+        data_max_publicacao=None,
+        n_abertas=0,
+        n_interesse_ou_salva=2,
+        n_participacao=1,
+        n_resultado=1,
+        tem_anotacao=True,
+    )
+    assert com_usuario["prioridade_score"] > basico["prioridade_score"] - 40
+    assert any("interesse" in m.lower() or "salva" in m.lower() for m in com_usuario["motivos_prioridade"])
+    assert any("participação" in m.lower() or "fluxo" in m.lower() for m in com_usuario["motivos_prioridade"])

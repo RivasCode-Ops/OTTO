@@ -127,6 +127,7 @@ export function ExplorarPanel({
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Prioridade</th>
                   <th>Órgão</th>
                   <th>UF</th>
                   <th>Oportunidades</th>
@@ -149,6 +150,17 @@ export function ExplorarPanel({
                       }
                     }}
                   >
+                    <td>
+                      <strong>{o.prioridade_score ?? '—'}</strong>
+                      {o.motivos_prioridade?.length ? (
+                        <div className="muted" title={o.motivos_prioridade.join(' · ')}>
+                          {o.motivos_prioridade[0]}
+                          {o.motivos_prioridade.length > 1
+                            ? ` · +${o.motivos_prioridade.length - 1}`
+                            : ''}
+                        </div>
+                      ) : null}
+                    </td>
                     <td>
                       {o.nome}
                       {o.cnpj ? <div className="muted">{o.cnpj}</div> : null}
@@ -179,6 +191,16 @@ export function ExplorarPanel({
             {detalhe.historico_disponivel.n_registros} registro(s)
           </p>
           <p className="drawer__hint">{detalhe.aviso}</p>
+          {detalhe.orgao.motivos_prioridade?.length ? (
+            <>
+              <h4>Motivo da prioridade (score {detalhe.orgao.prioridade_score ?? '—'})</h4>
+              <ul>
+                {detalhe.orgao.motivos_prioridade.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <h4>Categorias observadas</h4>
           <ul>
             {detalhe.categorias_observadas.map((c) => (

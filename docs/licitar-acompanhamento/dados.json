@@ -912,10 +912,10 @@
     {
       "id": "§12.2",
       "titulo": "Priorização de órgãos",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Frequencia local em indicadores; priorizacao explicavel Fase 3 README.",
-      "falta": "Autorizacao para implementar priorizacao de orgaos (nao e fora do produto).",
-      "bloqueio": "Aguardando autorizacao da etapa"
+      "status": "implementado_validado",
+      "evidencia": "calcular_prioridade_orgao + list_orgaos ordena por score; motivos_prioridade na lista/detalhe; sinais: frequencia, categorias, valor/periodo, prazos abertos, interesse/salva, fluxo/resultado do usuario, anotacao. Sem reputacao. pytest test_orgaos_visoes; UI Explorar Órgãos.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§12.3",

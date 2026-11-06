@@ -351,6 +351,9 @@ export async function fetchOrgaos(opts?: { q?: string; uf?: string; limit?: numb
       setores_observados: string[];
       valor_estimado_soma?: number | null;
       periodo_publicacao?: { de?: string | null; ate?: string | null };
+      tem_anotacao?: boolean;
+      prioridade_score?: number;
+      motivos_prioridade?: string[];
     }[];
     total: number;
     aviso: string;
@@ -369,6 +372,8 @@ export async function fetchOrgao(chave: string) {
       ufs: string[];
       valor_estimado_soma?: number | null;
       periodo_publicacao?: { de?: string | null; ate?: string | null };
+      prioridade_score?: number;
+      motivos_prioridade?: string[];
     };
     categorias_observadas: { rotulo: string; quantidade: number }[];
     oportunidades: {

@@ -914,10 +914,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "§12.2",
       "titulo": "Priorização de órgãos",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Frequencia local em indicadores; priorizacao explicavel Fase 3 README.",
-      "falta": "Autorizacao para implementar priorizacao de orgaos (nao e fora do produto).",
-      "bloqueio": "Aguardando autorizacao da etapa"
+      "status": "implementado_validado",
+      "evidencia": "calcular_prioridade_orgao + list_orgaos ordena por score; motivos_prioridade na lista/detalhe; sinais: frequencia, categorias, valor/periodo, prazos abertos, interesse/salva, fluxo/resultado do usuario, anotacao. Sem reputacao. pytest test_orgaos_visoes; UI Explorar Órgãos.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§12.3",
@@ -1010,10 +1010,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "DOWNLOAD",
       "titulo": "Download automático de anexos",
-      "status": "dependente_decisao",
-      "evidencia": "Link da fonte abre no navegador; sem download automático.",
-      "falta": "Decisão + implementação.",
-      "bloqueio": "Decisão download (separada)"
+      "status": "implementado_validado",
+      "evidencia": "otto_core.download_anexos_store; GET/POST anexos-remotos; whitelist pncp.gov.br; PDF/DOCX/TXT ≤25MB; origem download_pncp; UI Buscar/Baixar; docs/DOWNLOAD-ANEXOS.md; pytest test_download_anexos.",
+      "falta": "— (ZIP e outros formatos: listados, extração manual)",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§4/§17-itens",
@@ -1034,6 +1034,13 @@ window.LICITAR_ACOMPANHAMENTO = {
   ],
   "evidencias": [],
   "historico_sessoes": [
+    {
+      "quando": "2026-11-06T01:35:00-03:00",
+      "o_que_mudou": "Download PNCP autorizado: listar/baixar anexos (whitelist pncp.gov.br); PDF/DOCX/TXT; UI Buscar/Baixar; docs/DOWNLOAD-ANEXOS.md.",
+      "o_que_foi_concluido": "Fatia download seletivo fechada. ZIP permanece manual.",
+      "comprovacao": "pytest test_download_anexos; typecheck; painel DOWNLOAD.",
+      "estado": "encerrada"
+    },
     {
       "quando": "2026-11-06T01:25:00-03:00",
       "o_que_mudou": "DOCX autorizado: upload .docx; extracao python-docx; pagina opcional na evidencia; docs/DOCX.md; .doc legado rejeitado.",

@@ -43,3 +43,7 @@ logs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Artefatos locais de sessão (instaladores, dumps, screenshots)
+tmp/
+Img/

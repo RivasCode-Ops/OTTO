@@ -4,11 +4,11 @@ window.LICITAR_ACOMPANHAMENTO = {
   "meta": {
     "titulo": "Acompanhar a construção do LICITAR",
     "subtitulo": "Painel de desenvolvimento — não é o aplicativo de oportunidades",
-    "atualizado_em": "2026-11-06T14:30:00-03:00",
+    "atualizado_em": "2026-11-06T14:35:00-03:00",
     "aviso_atualizacao": "Este painel NÃO atualiza sozinho. Ele só muda quando o assistente (ou você) registra uma nova atualização. Se a conversa estiver parada, o trabalho também está parado.",
-    "sessao_agente": "em_andamento",
+    "sessao_agente": "encerrada",
     "como_abrir": "Abra painel.html nesta pasta (duplo clique). App: INICIAR-OTTO.bat → http://127.0.0.1:5194. Docs: INSTALACAO · OCR · DOCX · DOWNLOAD-ANEXOS · NICHOS.",
-    "onde_esta_o_projeto": "Branch wip/uf-nicho-filtros-classificador: multi-nicho, escopo UF, §12.2 orgaos, §14 Saude/Viagens, restore, IMPORT-JSON, coleta #12. Tesseract 5.5.3+por instalado. Push/PR em andamento → RivasCode-Ops/OTTO.",
+    "onde_esta_o_projeto": "Branch wip no GitHub (RivasCode-Ops/OTTO). PR #1 aberto. Tesseract 5.5.3+por no PC. Fila autorizada desta rodada entregue.",
     "proxima_entrega_proposta": {
       "nome": "§12.4 Concorrencia real — so com fonte de participantes/vencedores",
       "id_interno": "concorrencia-fonte",
@@ -22,16 +22,15 @@ window.LICITAR_ACOMPANHAMENTO = {
       "Multi-nicho + filtros UF/nicho; KPI escopo PI; labels amigaveis; coleta #12 (1 novo TI).",
       "§12.2 priorizacao orgaos; §14 Saude/Viagens; restore operacional; IMPORT-JSON na UI.",
       "DOCX, OCR (codigo), download anexos PNCP, IA local, painel Configuracoes/ingest.",
-      "Tesseract OCR 5.5.3 instalado em C:\\Program Files\\Tesseract-OCR (eng+por)."
+      "Tesseract OCR 5.5.3 instalado (eng+por). Push main+wip; PR https://github.com/RivasCode-Ops/OTTO/pull/1."
     ],
-    "esta_sendo_feito": [
-      "Push + PR da branch wip para github.com/RivasCode-Ops/OTTO; sync METODO."
-    ],
-    "mensagem_sem_execucao": "",
+    "esta_sendo_feito": [],
+    "mensagem_sem_execucao": "Rodada encerrada. Merge do PR #1 e §12.4 so com fonte — a pedido.",
     "falta_fazer": [
       "§12.4 concorrencia — bloqueada ate fonte de participantes/vencedores.",
       "ADIADOS DE PROPOSITO: validacao humana da IA local; teste rede fisicamente off.",
-      "Ajuste fino de nichos (ex. telefone/ANATEL → obras) se aparecer em uso."
+      "Ajuste fino de nichos (ex. telefone/ANATEL → obras) se aparecer em uso.",
+      "Merge do PR #1 quando quiser."
     ],
     "precisa_de_mim": [
       {
@@ -1036,11 +1035,18 @@ window.LICITAR_ACOMPANHAMENTO = {
   "evidencias": [],
   "historico_sessoes": [
     {
+      "quando": "2026-11-06T14:35:00-03:00",
+      "o_que_mudou": "Tesseract 5.5.3+por; remote origin; push master→main + wip; PR #1; METODO (11); painel fechado.",
+      "o_que_foi_concluido": "Tudo da lista 'faça tudo' desta sessao: painel, Tesseract, push/PR, METODO.",
+      "comprovacao": "https://github.com/RivasCode-Ops/OTTO/pull/1 ; tesseract 5.5.3 por; commit 2826775+.",
+      "estado": "encerrada"
+    },
+    {
       "quando": "2026-11-06T14:30:00-03:00",
       "o_que_mudou": "Tesseract 5.5.3+por instalado; remote RivasCode-Ops/OTTO (vazio) ligado para push/PR; painel e gitignore tmp/Img.",
       "o_que_foi_concluido": "OCR de sistema pronto. Fila de codigo da rodada anterior ja commitada (c2b5929..dd920b7).",
       "comprovacao": "tesseract --version 5.5.3; --list-langs eng/osd/por; installer GitHub releases.",
-      "estado": "em_andamento"
+      "estado": "encerrada"
     },
     {
       "quando": "2026-11-06T14:16:00-03:00",

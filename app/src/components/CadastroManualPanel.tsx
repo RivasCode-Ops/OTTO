@@ -1,9 +1,23 @@
 import { useState } from 'react';
-import { createOportunidadeManual } from '../api';
+import { createOportunidadeManual, importOportunidadesManualJson } from '../api';
 
 type Props = {
   onCreated: (numero: string) => void;
 };
+
+const EXEMPLO_JSON = `{
+  "items": [
+    {
+      "objeto_compra": "Exemplo — aquisição de material de escritório",
+      "orgao_razao_social": "PREFEITURA EXEMPLO",
+      "uf": "PI",
+      "municipio": "Teresina",
+      "modalidade": "Pregão - Eletrônico",
+      "data_encerramento": "2026-12-15",
+      "valor_total_estimado": 1000
+    }
+  ]
+}`;
 
 export function CadastroManualPanel({ onCreated }: Props) {
   const [objeto, setObjeto] = useState('');
@@ -16,11 +30,15 @@ export function CadastroManualPanel({ onCreated }: Props) {
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
   const [saving, setSaving] = useState(false);
+  const [jsonText, setJsonText] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResumo, setImportResumo] = useState('');
 
   async function salvar() {
     setSaving(true);
     setErro('');
     setMsg('');
+    setImportResumo('');
     try {
       const r = await createOportunidadeManual({
         objeto_compra: objeto,
@@ -39,6 +57,47 @@ export function CadastroManualPanel({ onCreated }: Props) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function importarJson() {
+    setImporting(true);
+    setErro('');
+    setMsg('');
+    setImportResumo('');
+    try {
+      const parsed: unknown = JSON.parse(jsonText);
+      const r = await importOportunidadesManualJson(parsed);
+      const nOk = r.criados?.length ?? 0;
+      const nErr = r.erros?.length ?? 0;
+      setMsg(r.aviso || 'Importação concluída.');
+      setImportResumo(
+        `${nOk} criado(s)` +
+          (nErr
+            ? ` · ${nErr} erro(s): ${r.erros
+                .slice(0, 5)
+                .map((e) => `#${e.indice} ${e.erro}`)
+                .join('; ')}${nErr > 5 ? '…' : ''}`
+            : ''),
+      );
+      if (r.criados?.length) {
+        onCreated(r.criados[r.criados.length - 1]);
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha na importação JSON');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function onFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const t = typeof reader.result === 'string' ? reader.result : '';
+      setJsonText(t);
+    };
+    reader.onerror = () => setErro('Não foi possível ler o arquivo.');
+    reader.readAsText(file, 'UTF-8');
   }
 
   return (
@@ -83,13 +142,56 @@ export function CadastroManualPanel({ onCreated }: Props) {
       <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void salvar()}>
         {saving ? 'Guardando…' : 'Cadastrar oportunidade'}
       </button>
+
+      <section className="drawer__block" style={{ marginTop: '1.25rem' }}>
+      <h3>Importação JSON em lote</h3>
       <p className="drawer__hint">
-        Importação em lote por JSON existe no código (API), mas ficou fora do escopo autorizado desta
-        etapa e não está disponível nesta tela até avaliação.
+        Aceita uma lista <code>[...]</code> ou <code>{`{"items":[...]}`}</code>. Cada item vira
+        registro com origem “manual” (números <code>MANUAL-…</code>). Não altera coleta PNCP. Campos
+        úteis: objeto_compra, orgao_razao_social, uf, municipio, modalidade, valor_total_estimado,
+        data_encerramento.
       </p>
+      <label className="acomp__label">
+        Arquivo .json (opcional)
+        <input
+          type="file"
+          accept=".json,application/json,text/plain"
+          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      <label className="acomp__label">
+        JSON
+        <textarea
+          rows={10}
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+          placeholder={EXEMPLO_JSON}
+          spellCheck={false}
+        />
+      </label>
+      <div className="acomp__actions">
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={importing || !jsonText.trim()}
+          onClick={() => void importarJson()}
+        >
+          {importing ? 'Importando…' : 'Importar JSON'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={importing}
+          onClick={() => setJsonText(EXEMPLO_JSON)}
+        >
+          Colar exemplo
+        </button>
+      </div>
 
       {msg && <p className="acomp__ok">{msg}</p>}
+      {importResumo && <p className="muted">{importResumo}</p>}
       {erro && <p className="acomp__err">{erro}</p>}
+      </section>
     </section>
   );
 }

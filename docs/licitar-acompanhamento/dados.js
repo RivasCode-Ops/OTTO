@@ -27,7 +27,6 @@ window.LICITAR_ACOMPANHAMENTO = {
     "falta_fazer": [
       "Instalar Tesseract (dono) se PDF digitalizado for prioridade (opcional).",
       "§12.4 concorrencia — bloqueada ate fonte.",
-      "AGUARDANDO AUTORIZACAO: IMPORT-JSON na UI.",
       "ADIADOS DE PROPOSITO: validacao humana da IA local; teste rede fisicamente off."
     ],
     "precisa_de_mim": [
@@ -86,9 +85,7 @@ window.LICITAR_ACOMPANHAMENTO = {
       "Validacao humana da IA local (revisao de qualidade em uso real pelo dono)",
       "Teste com rede fisicamente desligada (endpoint local != esse teste)"
     ],
-    "aguardando_autorizacao": [
-      "IMPORT-JSON na UI"
-    ],
+    "aguardando_autorizacao": [],
     "integracao": {
       "status": "ok",
       "detalhe": "Regressao + fluxo completo + falhas/cobertura. Sem nuvem."
@@ -812,7 +809,7 @@ window.LICITAR_ACOMPANHAMENTO = {
       "titulo": "Entrada de dados / cadastro manual",
       "status": "implementado_validado",
       "evidencia": "Cadastro unitario manual (POST /api/oportunidades/manual + CadastroManualPanel); origem_registro=manual vs pncp. Import JSON removido da UI nesta correcao.",
-      "falta": "— (cadastro unitario). Import JSON: ver item IMPORT-JSON (fora do escopo autorizado).",
+      "falta": "—",
       "bloqueio": "Nenhum para cadastro unitario"
     },
     {
@@ -1026,10 +1023,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "IMPORT-JSON",
       "titulo": "Importacao JSON em lote (manual)",
-      "status": "implementada_fora_escopo_aguardando_avaliacao",
-      "evidencia": "Codigo/API POST /api/oportunidades/manual/import permanece. UI removida. Registro MANUAL-595A3D764039 preservado. Auditoria import_manual_json.",
-      "falta": "Avaliacao/autorizacao para expor de novo na interface (ou decidir o destino da API).",
-      "bloqueio": "Fora do escopo do bloco autorizado; nao e requisito aprovado"
+      "status": "implementado_validado",
+      "evidencia": "POST /api/oportunidades/manual/import + CadastroManualPanel (textarea/arquivo); origem manual; auditoria import_manual_json; pytest importar_manuais_json.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     }
   ],
   "evidencias": [],

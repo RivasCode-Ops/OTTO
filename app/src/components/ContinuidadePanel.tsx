@@ -424,8 +424,8 @@ export function ContinuidadePanel({ numero }: Props) {
         <h3>Cópia de segurança (local)</h3>
         <p className="drawer__hint">
           Backup grava banco + documentos. Não inclui perfil/preferências do navegador
-          (localStorage). Restauração só em pasta isolada — não substitui o banco operacional
-          automaticamente.
+          (localStorage). Aqui: restauração em cópia isolada. Para substituir o banco
+          operacional (com confirmação), use Configurações.
         </p>
         <button type="button" className="btn btn--primary" onClick={() => void doBackup()}>
           Criar backup agora

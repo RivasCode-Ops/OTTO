@@ -16,7 +16,13 @@ from otto_core.analise_store import (
     update_campo,
     update_checklist_item,
 )
-from otto_core.backup import criar_backup, listar_backups, restaurar_em_copia
+from otto_core.backup import (
+    CONFIRMACAO_RESTORE_OPERACIONAL,
+    criar_backup,
+    listar_backups,
+    restaurar_em_copia,
+    restaurar_operacional,
+)
 from otto_core.config import DATA_DIR, DB_PATH
 from otto_core.ingest_store import (
     IngestEmAndamentoError,
@@ -1146,11 +1152,15 @@ def get_configuracoes() -> dict:
         "download_automatico_anexos": True,
         "perfil_obrigatorio": False,
         "restore_operacional": {
-            "disponivel_na_ui": False,
+            "disponivel_na_ui": True,
+            "confirmacao_exigida": CONFIRMACAO_RESTORE_OPERACIONAL,
             "procedimento": (
-                "Restauração operacional (substituir otto.db) é procedimento restrito "
-                "e exige autorização explícita. A UI só permite restauração em pasta isolada "
-                "(data/restore-test-*)."
+                "Restauração operacional substitui otto.db e a pasta documentos. "
+                "Exige digitar a confirmação "
+                f"{CONFIRMACAO_RESTORE_OPERACIONAL}. "
+                "Antes, o sistema cria um backup automático de segurança. "
+                "A restauração em cópia isolada (data/restore-test-*) continua disponível "
+                "para validar sem alterar o banco operacional."
             ),
         },
         "cobertura": cob,
@@ -1423,6 +1433,28 @@ def post_backup() -> dict:
         return criar_backup()
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
+
+
+@app.post("/api/backup/restaurar-operacional")
+def post_restaurar_operacional(
+    nome: str = Query(..., description="Nome do zip em data/backups"),
+    body: dict = {},  # noqa: B006 — JSON { confirmacao }
+) -> dict:
+    """Substitui otto.db + documentos. Body: { confirmacao: SUBSTITUIR-BANCO-OPERACIONAL }."""
+    from otto_core.backup import BACKUPS_DIR
+
+    confirmacao = str(body.get("confirmacao") or "")
+    zip_path = (BACKUPS_DIR / nome).resolve()
+    try:
+        if not str(zip_path).startswith(str(BACKUPS_DIR.resolve())):
+            raise HTTPException(400, "Caminho de backup inválido")
+        return restaurar_operacional(zip_path, confirmacao=confirmacao)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e)) from e
+    except OSError as e:
+        raise HTTPException(409, str(e)) from e
 
 
 @app.post("/api/backup/restaurar-em-copia")

@@ -334,6 +334,27 @@ export async function restoreBackupCopy(nome: string): Promise<{ aviso: string; 
   return r.json();
 }
 
+export const CONFIRMACAO_RESTORE_OPERACIONAL = 'SUBSTITUIR-BANCO-OPERACIONAL';
+
+export async function restoreBackupOperacional(
+  nome: string,
+  confirmacao: string,
+): Promise<{
+  ok: boolean;
+  aviso: string;
+  backup_seguranca: string;
+  oportunidades: number;
+}> {
+  const q = new URLSearchParams({ nome });
+  const r = await fetch(`${base}/api/backup/restaurar-operacional?${q}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmacao }),
+  });
+  await ensureOk(r, 'Falha no restore operacional');
+  return r.json();
+}
+
 export async function fetchOrgaos(opts?: { q?: string; uf?: string; limit?: number }) {
   const q = new URLSearchParams();
   if (opts?.q) q.set('q', opts.q);
@@ -476,7 +497,11 @@ export async function fetchConfiguracoes() {
     docx: boolean;
     download_automatico_anexos: boolean;
     perfil_obrigatorio: boolean;
-    restore_operacional: { disponivel_na_ui: boolean; procedimento: string };
+    restore_operacional: {
+      disponivel_na_ui: boolean;
+      procedimento: string;
+      confirmacao_exigida?: string;
+    };
     cobertura: unknown;
     aviso: string;
   }>;

@@ -27,7 +27,7 @@ window.LICITAR_ACOMPANHAMENTO = {
     "falta_fazer": [
       "Instalar Tesseract (dono) se PDF digitalizado for prioridade (opcional).",
       "§12.4 concorrencia — bloqueada ate fonte.",
-      "AGUARDANDO AUTORIZACAO: restore operacional, IMPORT-JSON na UI.",
+      "AGUARDANDO AUTORIZACAO: IMPORT-JSON na UI.",
       "ADIADOS DE PROPOSITO: validacao humana da IA local; teste rede fisicamente off."
     ],
     "precisa_de_mim": [
@@ -87,7 +87,6 @@ window.LICITAR_ACOMPANHAMENTO = {
       "Teste com rede fisicamente desligada (endpoint local != esse teste)"
     ],
     "aguardando_autorizacao": [
-      "Restore operacional do banco (substituir otto.db)",
       "IMPORT-JSON na UI"
     ],
     "integracao": {
@@ -963,10 +962,10 @@ window.LICITAR_ACOMPANHAMENTO = {
     {
       "id": "§15-restore-op",
       "titulo": "Restauração operacional do banco",
-      "status": "prevista_aguardando_autorizacao",
-      "evidencia": "Restore isolado ativo; operacional exige autorizacao; nao bloqueia desenvolvimento.",
-      "falta": "Autorizacao explicita para substituir otto.db.",
-      "bloqueio": "Procedimento restrito (nao bloqueia outras funcionalidades)"
+      "status": "implementado_validado",
+      "evidencia": "restaurar_operacional + POST /api/backup/restaurar-operacional; confirmacao SUBSTITUIR-BANCO-OPERACIONAL; backup de seguranca automatico; UI Configuracoes; pytest test_backup_restore_op.",
+      "falta": "—",
+      "bloqueio": "Nenhum"
     },
     {
       "id": "§16",
